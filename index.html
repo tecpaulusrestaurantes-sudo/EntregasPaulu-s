@@ -1,0 +1,1832 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paulu's — Pedidos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --teal-deep:#0d5c50;
+    --teal:#12786a;
+    --teal-light:#e4efec;
+    --gold:#c9a24d;
+    --gold-light:#f1e4c2;
+    --cream:#f7f3ea;
+    --paper:#fffdf8;
+    --ink:#20302c;
+    --ink-soft:#5c6c66;
+    --line:#e3ddca;
+    --danger:#b5473a;
+    --radius:14px;
+    --shadow:0 6px 20px rgba(20,40,35,0.08);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--cream);
+    color:var(--ink);
+    font-family:'Work Sans',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.display{
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    letter-spacing:-0.01em;
+  }
+  button{font-family:inherit;cursor:pointer;}
+  input,select{font-family:inherit;}
+  ::selection{background:var(--gold-light);}
+
+  /* ---- App shell ---- */
+  #app{min-height:100vh;display:flex;flex-direction:column;}
+
+  header.topbar{
+    background:var(--paper);
+    border-bottom:1px solid var(--line);
+    padding:14px 22px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    position:sticky;top:0;z-index:40;
+    flex-wrap:wrap;
+  }
+  .brand{display:flex;align-items:center;gap:12px;}
+  .brand img{height:42px;width:auto;display:block;}
+  .brand-text{display:flex;flex-direction:column;line-height:1.1;}
+  .brand-text .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:600;}
+  .brand-text .name{font-family:'Fraunces',serif;font-size:19px;color:var(--teal-deep);}
+  .nav-toggle{display:flex;background:var(--teal-light);border-radius:999px;padding:4px;gap:2px;flex-wrap:wrap;}
+  .nav-toggle button{
+    border:none;background:transparent;padding:8px 16px;border-radius:999px;
+    font-size:13px;font-weight:600;color:var(--teal-deep);opacity:.6;transition:.15s;
+  }
+  .nav-toggle button.active{background:var(--teal-deep);color:#fff;opacity:1;box-shadow:var(--shadow);}
+  .who-badge{font-size:11.5px;color:var(--ink-soft);display:flex;align-items:center;gap:8px;}
+  .who-badge b{color:var(--teal-deep);}
+  .who-badge button{background:none;border:none;color:var(--danger);font-size:11.5px;font-weight:600;text-decoration:underline;padding:0;}
+
+  main{flex:1;width:100%;max-width:1180px;margin:0 auto;padding:26px 20px 100px;}
+
+  /* ---- Loja: identificação ---- */
+  .id-bar{
+    background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px 18px;display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;margin-bottom:22px;
+    box-shadow:var(--shadow);
+  }
+  .field{display:flex;flex-direction:column;gap:6px;flex:1;min-width:180px;}
+  .field label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-soft);font-weight:600;}
+  .field select,.field input{
+    border:1px solid var(--line);border-radius:9px;padding:10px 12px;font-size:14.5px;background:#fff;color:var(--ink);
+  }
+  .field select:focus,.field input:focus{outline:none;border-color:var(--teal);}
+  .field input[readonly]{background:var(--teal-light);color:var(--teal-deep);font-weight:600;}
+
+  .search-row{display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap;}
+  .search-row input{
+    flex:1;min-width:220px;border:1px solid var(--line);border-radius:999px;padding:12px 18px;font-size:14.5px;background:var(--paper);
+  }
+  .search-row input:focus{outline:none;border-color:var(--teal);}
+
+  .cat-pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;}
+  .cat-pills button{
+    border:1px solid var(--line);background:var(--paper);border-radius:999px;padding:7px 14px;font-size:12.5px;font-weight:600;color:var(--ink-soft);
+  }
+  .cat-pills button.active{background:var(--gold);border-color:var(--gold);color:#fff;}
+
+  .grid{
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px;
+  }
+  .card{
+    background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;
+    display:flex;flex-direction:column;box-shadow:var(--shadow);transition:transform .15s;
+  }
+  .card:hover{transform:translateY(-2px);}
+  .card .photo{
+    width:100%;aspect-ratio:1/1;background:var(--teal-light) center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--teal);font-size:12px;
+  }
+  .card .photo svg{width:34px;height:34px;opacity:.4;}
+  .card .body{padding:12px 13px 14px;display:flex;flex-direction:column;gap:10px;flex:1;}
+  .card .pname{font-size:14px;font-weight:600;line-height:1.3;min-height:36px;}
+  .card .pcat{font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.05em;}
+  .card .pcat.restrito{color:var(--gold);}
+  .stepper{display:flex;align-items:center;justify-content:space-between;margin-top:auto;background:var(--teal-light);border-radius:9px;padding:5px;}
+  .stepper button{
+    width:30px;height:30px;border-radius:7px;border:none;background:var(--paper);color:var(--teal-deep);font-size:17px;font-weight:700;line-height:1;box-shadow:0 1px 3px rgba(0,0,0,.08);
+  }
+  .stepper button:active{transform:scale(.95);}
+  .stepper .qty{font-weight:700;font-size:15px;min-width:26px;text-align:center;color:var(--teal-deep);}
+  .stepper input.qty-input{
+    width:56px;border:none;background:transparent;text-align:center;font-weight:700;font-size:14px;color:var(--teal-deep);
+  }
+  .stepper input.qty-input:focus{outline:none;}
+  .medida-tag{font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;}
+  .subtabs{display:flex;gap:6px;margin-bottom:16px;background:var(--teal-light);border-radius:999px;padding:4px;width:fit-content;}
+  .subtabs button{border:none;background:transparent;padding:7px 16px;border-radius:999px;font-size:12.5px;font-weight:600;color:var(--teal-deep);opacity:.65;}
+  .subtabs button.active{background:var(--teal-deep);color:#fff;opacity:1;}
+  .qty-compare{display:flex;gap:14px;font-size:12.5px;color:var(--ink-soft);}
+  .qty-compare b{color:var(--ink);}
+
+  .empty-state{
+    text-align:center;padding:60px 20px;color:var(--ink-soft);
+  }
+  .empty-state .display{font-size:22px;color:var(--teal-deep);margin-bottom:8px;}
+
+  /* ---- Cart FAB + drawer ---- */
+  .cart-fab{
+    position:fixed;right:22px;bottom:22px;background:var(--teal-deep);color:#fff;border:none;border-radius:999px;
+    padding:14px 22px;display:flex;align-items:center;gap:10px;font-weight:600;font-size:14.5px;box-shadow:0 10px 26px rgba(13,92,80,.35);z-index:45;
+  }
+  .cart-fab .badge{background:var(--gold);border-radius:999px;padding:2px 9px;font-size:12.5px;font-weight:700;}
+
+  .drawer-overlay{position:fixed;inset:0;background:rgba(20,32,28,.42);z-index:60;display:flex;justify-content:flex-end;}
+  .drawer{
+    width:min(400px,92vw);background:var(--paper);height:100%;display:flex;flex-direction:column;box-shadow:-10px 0 30px rgba(0,0,0,.15);
+  }
+  .drawer header{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;}
+  .drawer header h3{margin:0;font-size:18px;color:var(--teal-deep);}
+  .drawer header button{background:none;border:none;font-size:22px;color:var(--ink-soft);}
+  .drawer .items{flex:1;overflow-y:auto;padding:12px 20px;}
+  .cart-line{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);}
+  .cart-line img{width:44px;height:44px;border-radius:8px;object-fit:cover;background:var(--teal-light);}
+  .cart-line .info{flex:1;}
+  .cart-line .info .n{font-size:13.5px;font-weight:600;}
+  .cart-line .stepper{padding:3px;}
+  .cart-line .stepper button{width:24px;height:24px;font-size:14px;}
+  .cart-line .rm{background:none;border:none;color:var(--danger);font-size:12px;font-weight:600;margin-top:4px;}
+  .drawer footer{padding:16px 20px 20px;border-top:1px solid var(--line);}
+  .btn-primary{
+    width:100%;background:var(--teal-deep);color:#fff;border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:700;box-shadow:var(--shadow);
+  }
+  .btn-primary:disabled{background:#b9c4c1;cursor:not-allowed;box-shadow:none;}
+  .btn-secondary{background:var(--paper);border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:12px 16px;font-size:14px;font-weight:600;}
+  .hint{font-size:12px;color:var(--ink-soft);margin-top:8px;text-align:center;}
+
+  /* ---- Confirmation ---- */
+  .confirm{
+    max-width:420px;margin:60px auto;text-align:center;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:40px 30px;box-shadow:var(--shadow);
+  }
+  .confirm .check{
+    width:64px;height:64px;border-radius:50%;background:var(--teal-light);color:var(--teal-deep);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-size:30px;
+  }
+
+  /* ---- Login gates (loja/estoque/nutri/admin) ---- */
+  .login-gate{max-width:360px;margin:70px auto;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:32px;box-shadow:var(--shadow);text-align:center;}
+  .login-gate .eyebrow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);font-weight:700;}
+  .login-gate select,.login-gate input{width:100%;text-align:center;margin:8px 0;}
+  .login-gate .btn-primary{margin-top:10px;}
+
+  /* ---- Admin ---- */
+  .admin-tabs{display:flex;gap:8px;margin-bottom:22px;border-bottom:1px solid var(--line);flex-wrap:wrap;}
+  .admin-tabs button{background:none;border:none;padding:10px 4px;margin-right:22px;font-size:14px;font-weight:600;color:var(--ink-soft);border-bottom:2px solid transparent;}
+  .admin-tabs button.active{color:var(--teal-deep);border-color:var(--gold);}
+
+  .panel{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);margin-bottom:20px;}
+  .panel h3{margin:0 0 14px;font-size:16px;color:var(--teal-deep);}
+  .form-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end;}
+  .form-row .field{min-width:150px;}
+  .checkbox-row{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;color:var(--ink);margin:4px 0 12px;}
+  .checkbox-row input{width:16px;height:16px;}
+
+  table.admin-table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  table.admin-table th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);padding:8px 10px;border-bottom:1px solid var(--line);}
+  table.admin-table td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  table.admin-table img{width:38px;height:38px;object-fit:cover;border-radius:7px;background:var(--teal-light);}
+  table.admin-table input.inline-pass{width:110px;border:1px solid var(--line);border-radius:7px;padding:6px 8px;font-size:13px;}
+  .row-actions button{border:none;background:none;font-size:12.5px;font-weight:600;margin-right:12px;padding:0;}
+  .row-actions .edit{color:var(--teal-deep);}
+  .row-actions .del{color:var(--danger);}
+  .role-badge{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:3px 9px;border-radius:999px;background:var(--teal-light);color:var(--teal-deep);}
+
+  .order-card{border:1px solid var(--line);border-radius:11px;padding:14px 16px;margin-bottom:12px;background:#fff;}
+  .order-card .meta{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;font-size:12.5px;color:var(--ink-soft);margin-bottom:8px;}
+  .order-card .meta b{color:var(--ink);}
+  .order-card ul{margin:0;padding-left:18px;font-size:13.5px;}
+
+  .pending-card{border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:16px;background:#fff;box-shadow:var(--shadow);}
+  .pending-card .meta{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;font-size:12.5px;color:var(--ink-soft);margin-bottom:12px;}
+  .pending-card .meta b{color:var(--ink);}
+  .item-recv-row{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px dashed var(--line);}
+  .item-recv-row:last-of-type{border-bottom:none;}
+  .item-recv-row .n{flex:1;font-size:13.5px;font-weight:600;}
+  .item-recv-row .solicitada{font-size:12px;color:var(--ink-soft);min-width:90px;}
+  .item-recv-row input.recv-qty{width:70px;border:1px solid var(--line);border-radius:8px;padding:8px;text-align:center;font-size:14px;}
+  .status-pill{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:4px 10px;border-radius:999px;}
+  .status-pill.pendente{background:var(--gold-light);color:#8a6a1f;}
+  .status-pill.recebido{background:var(--teal-light);color:var(--teal-deep);}
+  .origem-tag{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--teal-light);color:var(--teal-deep);text-transform:uppercase;letter-spacing:.03em;}
+  .edit-tag{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;background:#fde3e0;color:#a3402f;text-transform:uppercase;letter-spacing:.03em;}
+  .edit-banner{background:#fdf1e8;border:1px solid #f0c9a8;color:#8a4a1f;font-size:12.5px;font-weight:600;padding:8px 12px;border-radius:8px;margin-bottom:10px;}
+  .meat-warning{background:#fde9e7;border:1.5px solid var(--danger);color:#8a2e22;font-size:13px;font-weight:700;padding:10px 14px;border-radius:8px;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+
+  .integ-status{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;margin-top:10px;}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--danger);}
+  .dot.ok{background:var(--teal);}
+
+  .toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
+  .muted{color:var(--ink-soft);font-size:13px;}
+  .small-btn{border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 13px;font-size:12.5px;font-weight:600;color:var(--ink);}
+
+  .edit-item-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px dashed var(--line);}
+  .edit-item-row .n{flex:1;font-size:13.5px;font-weight:600;}
+  .edit-item-row input.edit-qty{width:80px;border:1px solid var(--line);border-radius:8px;padding:8px;text-align:center;font-size:14px;}
+  .edit-item-row .rm{background:none;border:none;color:var(--danger);font-size:12px;font-weight:600;}
+
+  .toast{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--teal-deep);color:#fff;padding:12px 20px;border-radius:999px;font-size:13.5px;font-weight:600;box-shadow:var(--shadow);z-index:80;
+  }
+  @media(max-width:640px){
+    header.topbar{padding:12px 14px;}
+    .brand-text .name{font-size:16px;}
+    main{padding:18px 12px 100px;}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const LOGO = "data:image/jpeg;base64,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";
+// A senha do admin agora fica no banco (hash), verificada via função login_admin().
+// A URL/chave do Supabase ficam configuráveis em Admin > Integração.
+
+/* ---------------- Supabase (fonte de verdade real, com regras de segurança no servidor) ---------------- */
+let sbClient = null;
+let sbClientKeyUsed = '';
+function getClient(){
+  if(!state.supabaseUrl || !state.supabaseKey) return null;
+  const cacheKey = state.supabaseUrl + '|' + state.supabaseKey;
+  if(!sbClient || sbClientKeyUsed !== cacheKey){
+    sbClient = window.supabase.createClient(state.supabaseUrl, state.supabaseKey);
+    sbClientKeyUsed = cacheKey;
+  }
+  return sbClient;
+}
+// Chama uma função (RPC) do Supabase e devolve sempre {ok, data, error}
+async function callRpc(fn, params){
+  const sb = getClient();
+  if(!sb) return {ok:false, error:'Supabase não configurado.'};
+  try{
+    const { data, error } = await sb.rpc(fn, params);
+    if(error) return {ok:false, error: error.message};
+    return {ok:true, data};
+  }catch(e){
+    return {ok:false, error: 'Falha de conexão com o Supabase.'};
+  }
+}
+async function saveSupabaseConfig(){
+  state.supabaseUrl = state.supabaseUrlDraft.trim();
+  state.supabaseKey = state.supabaseKeyDraft.trim();
+  sbClient = null;
+  localStorageSafeSet('paulus_supabase_config', JSON.stringify({url: state.supabaseUrl, key: state.supabaseKey}));
+  showToast('Integração salva.');
+  await refreshCore();
+}
+async function testSupabaseConnection(){
+  showToast('Testando conexão...');
+  const r = await callRpc('listar_produtos', {});
+  showToast(r.ok ? 'Conexão OK!' : ('Não foi possível conectar: ' + r.error));
+}
+
+const MEDIDAS = {un:'un', kg:'kg', cx:'cx'};
+function round2(n){ return Math.round((parseFloat(n)||0)*100)/100; }
+
+let state = {
+  view: 'loja', // loja | estoque | nutri | admin
+  products: [],
+  units: [],
+  users: [], // {id, nome, papel:'estoquista'|'nutricionista', unidades}
+
+  // Loja
+  cart: {},
+  unidade: '',
+  solicitante: '',
+  search: '',
+  categoria: 'Todas',
+  cartOpen: false,
+  confirmed: null,
+  lojaUnlocked: false,
+  lojaSubTab: 'pedido',
+  lojaAcompStatus: 'Todos',
+  lojaAcompData: [],
+  lojaAcompLoading: false,
+  lojaAcompForms: {},
+  lojaSenhaInput: '',
+
+  // Estoquista
+  estoqueAuthed: false,
+  estoqueUser: null,
+  estoqueUserId: '',
+  estoqueSenhaInput: '',
+  estoqueUnidade: '',
+  estoqueCart: {},
+  estoqueSearch: '',
+  estoqueCategoria: 'Todas',
+  estoqueCartOpen: false,
+  estoqueConfirmed: null,
+  estoqueCarneFlag: false,
+  estoqueSubTab: 'novo',
+  estoqueAcompUnidade: 'Todas',
+  estoqueAcompStatus: 'Todos',
+  estoqueAcompTipo: 'Todos',
+  estoqueAcompData: [],
+  estoqueAcompLoading: false,
+
+  // Nutricionista
+  nutriAuthed: false,
+  nutriUser: null,
+  nutriUserId: '',
+  nutriSenhaInput: '',
+  nutriUnidade: '',
+  nutriLoading: false,
+  nutriPedidos: [],
+  nutriHistorico: [],
+  nutriSubTab: 'pendentes',
+  nutriForms: {},
+
+  // Admin
+  adminAuthed: false,
+  adminPass: '',
+  adminTab: 'produtos',
+  editingProduct: null,
+  editingUser: null,
+  editingPedido: null,
+  editPedidoAddId: '',
+  toast: null,
+  supabaseUrl: '',
+  supabaseKey: '',
+  supabaseUrlDraft: '',
+  supabaseKeyDraft: '',
+  adminPedidosUnidade: 'Todas',
+  adminPedidosStatus: 'Todos',
+  adminPedidosTipo: 'Todos',
+  adminPedidosData: [],
+  adminPedidosLoading: false,
+};
+
+function esc(s){
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function showToast(msg){
+  state.toast = msg;
+  render();
+  setTimeout(()=>{ state.toast = null; render(); }, 2400);
+}
+function uid(prefix){ return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+
+// Credenciais padrão do projeto Supabase (a chave "publishable/anon" é
+// pública por design — pode ficar aqui sem problema; a segurança de verdade
+// está nas regras do banco). Ainda dá pra trocar em Admin > Integração.
+const DEFAULT_SUPABASE_URL = 'https://zmfjvbvtmxwealsbxtgh.supabase.co';
+const DEFAULT_SUPABASE_KEY = 'sb_publishable_Ob9R2uUhRWJG77yS5KnngQ_fynioD-N';
+
+async function init(){
+  const saved = JSON.parse(localStorageSafeGet('paulus_supabase_config') || 'null');
+  state.supabaseUrl = (saved && saved.url) || DEFAULT_SUPABASE_URL;
+  state.supabaseKey = (saved && saved.key) || DEFAULT_SUPABASE_KEY;
+  state.supabaseUrlDraft = state.supabaseUrl;
+  state.supabaseKeyDraft = state.supabaseKey;
+  render();
+  if(state.supabaseUrl && state.supabaseKey){ await refreshCore(); }
+  setInterval(refreshCore, 15000);
+}
+
+// Guarda só a URL/chave do Supabase no navegador, pra não precisar redigitar
+// (não é dado sensível: a chave "anon" é pública por design — a segurança de
+// verdade está nas regras do banco, não no sigilo dela).
+function localStorageSafeGet(key){
+  try{ return localStorage.getItem(key); }catch(e){ return null; }
+}
+function localStorageSafeSet(key, value){
+  try{ localStorage.setItem(key, value); }catch(e){ /* ignora se indisponível */ }
+}
+
+async function refreshCore(){
+  if(state.cartOpen || state.estoqueCartOpen || state.editingProduct || state.editingUser || state.editingPedido) return;
+  if(!state.supabaseUrl || !state.supabaseKey) { render(); return; }
+  const [produtosR, unidadesR, usuariosR] = await Promise.all([
+    callRpc('listar_produtos', {}),
+    callRpc('listar_unidades_publicas', {}),
+    callRpc('listar_usuarios_publicos', {})
+  ]);
+  if(produtosR.ok) state.products = (produtosR.data || []).map(p=>({
+    id: p.id, nome: p.nome, categoria: p.categoria, foto: p.foto,
+    somenteEstoquista: p.somente_estoquista, unidadeMedida: p.unidade_medida
+  }));
+  if(unidadesR.ok) state.units = (unidadesR.data || []).map(u=>({id: u.id, nome: u.nome, temSenha: u.tem_senha}));
+  if(usuariosR.ok) state.users = (usuariosR.data || []).map(u=>({id: u.id, nome: u.nome, papel: u.papel, unidades: u.unidades || []}));
+  render();
+}
+async function manualRefresh(){
+  showToast('Atualizando dados...');
+  await refreshCore();
+  render();
+  showToast('Dados atualizados.');
+}
+async function refreshAdminData(){
+  await refreshCore();
+}
+
+/* ---------------- navegação ---------------- */
+function switchView(v){
+  state.view = v;
+  state.confirmed = null;
+  state.estoqueConfirmed = null;
+  if(v==='admin' && state.adminAuthed) refreshAdminData().then(render);
+  render();
+}
+
+/* ================= LOJA ================= */
+function setUnidade(v){
+  state.unidade = v;
+  state.lojaUnlocked = false;
+  state.lojaSenhaInput = '';
+  state.lojaSubTab = 'pedido';
+  render();
+}
+async function tryLojaLogin(){
+  const r = await callRpc('login_unidade', {p_nome: state.unidade, p_senha: state.lojaSenhaInput});
+  if(r.ok && r.data === true){
+    state.lojaUnlocked = true;
+    render();
+  } else {
+    showToast('Senha da unidade incorreta.');
+  }
+}
+function lojaLogout(){
+  state.lojaUnlocked = false;
+  state.lojaSenhaInput = '';
+  state.solicitante = '';
+  state.cart = {};
+  state.lojaSubTab = 'pedido';
+  render();
+}
+function cartCount(){ return Object.values(state.cart).reduce((a,b)=>a+b,0); }
+function setQty(id, qty){
+  qty = Math.max(0, round2(qty));
+  if(qty === 0) delete state.cart[id];
+  else state.cart[id] = qty;
+  render();
+}
+function changeQty(id, delta){ setQty(id, (state.cart[id]||0) + delta); }
+
+function stepFor(p){ return p && p.unidadeMedida === 'kg' ? 0.5 : 1; }
+function qtyControl(p, qty, incFnName, setFnName){
+  const isKg = p.unidadeMedida === 'kg';
+  const step = stepFor(p);
+  if(isKg){
+    return `
+    <div class="stepper">
+      <button onclick="${incFnName}('${p.id}',-${step})">−</button>
+      <input class="qty-input" type="number" step="0.1" min="0" value="${qty}" onchange="${setFnName}('${p.id}', this.value)"/>
+      <button onclick="${incFnName}('${p.id}',${step})">+</button>
+    </div>`;
+  }
+  return `
+    <div class="stepper">
+      <button onclick="${incFnName}('${p.id}',-1)" ${qty===0?'disabled':''}>−</button>
+      <span class="qty">${qty}${p.unidadeMedida==='cx'?' cx':''}</span>
+      <button onclick="${incFnName}('${p.id}',1)">+</button>
+    </div>`;
+}
+function medidaBadge(p){
+  const m = p.unidadeMedida || 'un';
+  const nomes = {un:'Unidade', kg:'Peso (kg)', cx:'Caixa'};
+  return m==='un' ? '' : `<span class="medida-tag">${nomes[m]}</span>`;
+}
+
+async function submitOrder(){
+  if(!state.unidade || !state.solicitante.trim() || cartCount()===0) return;
+  const itens = Object.entries(state.cart).map(([id, qtd])=>{
+    const p = state.products.find(pp=>pp.id===id);
+    return {id, nome: p ? p.nome : id, qtd, unidade: p ? (p.unidadeMedida||'un') : 'un'};
+  });
+  const order = {
+    id: uid('ped'),
+    unidade: state.unidade,
+    solicitante: state.solicitante.trim(),
+    origem: 'loja',
+    tipoPedido: 'geral',
+    itens,
+    data: new Date().toISOString()
+  };
+  const r = await callRpc('criar_pedido', {p_id: order.id, p_unidade: order.unidade, p_solicitante: order.solicitante, p_origem: order.origem, p_tipo_pedido: order.tipoPedido, p_itens: itens});
+  if(!r.ok){ showToast('Falha ao enviar o pedido: ' + r.error); return; }
+  state.cart = {};
+  state.cartOpen = false;
+  state.confirmed = order;
+  render();
+}
+function newOrder(){ state.confirmed = null; state.solicitante=''; render(); }
+function toggleCart(open){ state.cartOpen = open; render(); }
+function setSolicitante(v){ state.solicitante = v; }
+function setSearch(v){ state.search = v; render(); }
+function setCategoria(c){ state.categoria = c; render(); }
+
+function productPhoto(p){
+  if(p.foto) return `<div class="photo" style="background-image:url('${esc(p.foto)}')"></div>`;
+  return `<div class="photo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="M21 15l-5-5-9 9"/></svg></div>`;
+}
+
+function renderLoja(){
+  if(state.confirmed){
+    const o = state.confirmed;
+    return `
+    <div class="confirm">
+      <div class="check">✓</div>
+      <h2 class="display">Pedido enviado!</h2>
+      <p class="muted">Solicitado por <b>${esc(o.solicitante)}</b> — ${esc(o.unidade)}</p>
+      <p class="muted">${o.itens.length} ${o.itens.length===1?'item':'itens'} registrados.</p>
+      <button class="btn-primary" style="margin-top:18px" onclick="newOrder()">Fazer novo pedido</button>
+    </div>`;
+  }
+
+  const unidadeOptions = state.units.map(u=>`<option ${state.unidade===u.nome?'selected':''}>${esc(u.nome)}</option>`).join('');
+
+  if(!state.unidade){
+    return `
+      <div class="id-bar">
+        <div class="field">
+          <label>Unidade</label>
+          <select onchange="setUnidade(this.value)">
+            <option value="" selected disabled>Selecione a unidade</option>
+            ${unidadeOptions}
+          </select>
+        </div>
+      </div>
+      <p class="muted">Selecione sua unidade para começar o pedido.</p>
+    `;
+  }
+
+  const unit = state.units.find(u=>u.nome===state.unidade);
+  if(unit && unit.temSenha && !state.lojaUnlocked){
+    return `
+      <div class="id-bar">
+        <div class="field">
+          <label>Unidade</label>
+          <select onchange="setUnidade(this.value)">
+            ${unidadeOptions}
+          </select>
+        </div>
+      </div>
+      <div class="login-gate">
+        <span class="eyebrow">Acesso da unidade</span>
+        <h2 class="display">${esc(state.unidade)}</h2>
+        <input type="password" placeholder="Senha da unidade" value="${esc(state.lojaSenhaInput)}" oninput="state.lojaSenhaInput=this.value" onkeydown="if(event.key==='Enter') tryLojaLogin()"/>
+        <button class="btn-primary" onclick="tryLojaLogin()">Entrar</button>
+      </div>
+    `;
+  }
+
+  const visibleProducts = state.products.filter(p=>!p.somenteEstoquista);
+  const categories = ['Todas', ...Array.from(new Set(visibleProducts.map(p=>p.categoria).filter(Boolean)))];
+  const filtered = visibleProducts.filter(p=>{
+    const matchSearch = p.nome.toLowerCase().includes(state.search.toLowerCase());
+    const matchCat = state.categoria === 'Todas' || p.categoria === state.categoria;
+    return matchSearch && matchCat;
+  });
+
+  const cards = filtered.map(p=>{
+    const qty = state.cart[p.id] || 0;
+    return `
+    <div class="card">
+      ${productPhoto(p)}
+      <div class="body">
+        <div>
+          ${p.categoria?`<div class="pcat">${esc(p.categoria)}</div>`:''}
+          <div class="pname">${esc(p.nome)}</div>
+          ${medidaBadge(p)}
+        </div>
+        ${qtyControl(p, qty, 'changeQty', 'setQty')}
+      </div>
+    </div>`;
+  }).join('');
+
+  const gridOrEmpty = filtered.length
+    ? `<div class="grid">${cards}</div>`
+    : `<div class="empty-state"><div class="display">Nenhum produto encontrado</div><div>Tente buscar por outro termo.</div></div>`;
+  const catPills = categories.map(c=>`<button class="${state.categoria===c?'active':''}" onclick="setCategoria('${esc(c)}')">${esc(c)}</button>`).join('');
+
+  const subTab = state.lojaSubTab || 'pedido';
+  const pedidoContent = `
+    <div class="search-row">
+      <input id="loja-search-input" type="text" placeholder="Buscar produto..." value="${esc(state.search)}" oninput="setSearch(this.value)"/>
+    </div>
+    ${categories.length>1?`<div class="cat-pills">${catPills}</div>`:''}
+    ${gridOrEmpty}
+    ${cartCount()>0 ? `<button class="cart-fab" onclick="toggleCart(true)">🛒 Ver carrinho <span class="badge">${cartCount()}</span></button>` : ''}
+    ${state.cartOpen ? renderCartDrawer() : ''}
+  `;
+
+  return `
+    <div class="id-bar">
+      <div class="field">
+        <label>Unidade</label>
+        <select onchange="setUnidade(this.value)">${unidadeOptions}</select>
+      </div>
+      <div class="field">
+        <label>Nome do solicitante</label>
+        <input id="loja-solicitante-input" type="text" placeholder="Seu nome" value="${esc(state.solicitante)}" oninput="setSolicitante(this.value)"/>
+      </div>
+      ${unit && unit.temSenha ? `<button class="small-btn" onclick="lojaLogout()">Trocar de unidade</button>` : ''}
+    </div>
+    <div class="subtabs">
+      <button class="${subTab==='pedido'?'active':''}" onclick="setLojaSubTab('pedido')">Fazer pedido</button>
+      <button class="${subTab==='acompanhar'?'active':''}" onclick="setLojaSubTab('acompanhar')">Acompanhar pedidos</button>
+    </div>
+    ${subTab==='pedido' ? pedidoContent : renderLojaAcompanhar()}
+  `;
+}
+
+function setLojaSubTab(t){
+  state.lojaSubTab = t;
+  if(t==='acompanhar') loadLojaAcompanhamento(); else render();
+}
+async function loadLojaAcompanhamento(){
+  if(!state.supabaseUrl || !state.supabaseKey){ state.lojaAcompData = []; render(); return; }
+  state.lojaAcompLoading = true; render();
+  const status = state.lojaAcompStatus==='Todos' ? '' : state.lojaAcompStatus;
+  const r = await callRpc('listar_pedidos', {p_unidade: state.unidade, p_status: status, p_tipo_pedido: ''});
+  state.lojaAcompData = r.ok ? (r.data||[]) : [];
+  if(!r.ok) showToast('Não foi possível carregar: ' + r.error);
+  state.lojaAcompData.forEach(p=>{
+    if(p.status==='Pendente' && !state.lojaAcompForms[p.pedidoId]){
+      const qtds = {};
+      p.itens.forEach(it => qtds[it.produtoId] = it.qtdSolicitada);
+      state.lojaAcompForms[p.pedidoId] = {quemEnvia:'', quemRecebe:'', situacao:'Tudo conforme', observacao:'', qtds};
+    }
+  });
+  state.lojaAcompData.sort((a,b)=> new Date(b.data) - new Date(a.data));
+  state.lojaAcompLoading = false;
+  render();
+}
+function setLojaAcompStatus(v){ state.lojaAcompStatus = v; loadLojaAcompanhamento(); }
+function setLojaAcompField(pedidoId, field, value){ state.lojaAcompForms[pedidoId][field] = value; }
+function setLojaAcompQtd(pedidoId, produtoId, value){ state.lojaAcompForms[pedidoId].qtds[produtoId] = value; }
+
+async function confirmarRecebimentoLoja(pedidoId){
+  const pedido = state.lojaAcompData.find(p=>p.pedidoId===pedidoId);
+  const form = state.lojaAcompForms[pedidoId];
+  if(!form.quemEnvia.trim() || !form.quemRecebe.trim()){
+    showToast('Preencha o motorista e quem está recebendo.');
+    return;
+  }
+  if(pedido.tipoPedido === 'carne'){
+    const confirmado = confirm('Este pedido tem itens de carne. Você já pesou os itens antes de confirmar o recebimento?');
+    if(!confirmado) return;
+  }
+  const itens = pedido.itens.map(it => ({produtoId: it.produtoId, qtdRecebida: form.qtds[it.produtoId]}));
+  const r = await callRpc('confirmar_recebimento', {p_pedido_id: pedidoId, p_quem_envia: form.quemEnvia.trim(), p_quem_recebe: form.quemRecebe.trim(), p_situacao: form.situacao, p_observacao: (form.observacao||'').trim(), p_itens: itens});
+  if(r.ok){
+    delete state.lojaAcompForms[pedidoId];
+    showToast('Recebimento confirmado.');
+    loadLojaAcompanhamento();
+  } else {
+    showToast('Falha ao confirmar: ' + r.error);
+  }
+}
+
+function editedBanner(o){
+  return o.editadoPorAdmin ? `<div class="edit-banner">✏️ Este pedido foi alterado por um administrador${o.dataEdicao ? ' em '+new Date(o.dataEdicao).toLocaleString('pt-BR') : ''}.</div>` : '';
+}
+function editedTag(o){
+  return o.editadoPorAdmin ? `<span class="edit-tag">✏️ Editado pelo admin</span>` : '';
+}
+function meatWarning(o){
+  return o.tipoPedido === 'carne' ? `<div class="meat-warning">⚖️ Pedido de carne — pese os itens antes de confirmar o recebimento.</div>` : '';
+}
+
+function renderLojaAcompanhar(){
+  if(!state.supabaseUrl || !state.supabaseKey){
+    return `<div class="empty-state"><div class="display">Integração não configurada</div><div>Peça ao administrador para conectar a planilha do Google.</div></div>`;
+  }
+  const cards = state.lojaAcompData.map(o=>{
+    const header = `
+      <div class="meta">
+        <span><span class="origem-tag">${o.origem==='estoquista'?'Estoquista':'Unidade'}</span> ${o.tipoPedido==='carne'?'<span class="origem-tag" style="background:var(--gold-light);color:#8a6a1f">🥩 Carne</span>':''} ${editedTag(o)} &nbsp;${esc(o.solicitante)}</span>
+        <span class="status-pill ${o.status==='Recebido'?'recebido':'pendente'}">${esc(o.status==='Recebido' ? (o.situacao||'Recebido') : 'Pendente')}</span>
+      </div>
+      ${editedBanner(o)}`;
+
+    if(o.status !== 'Recebido'){
+      const form = state.lojaAcompForms[o.pedidoId] || {quemEnvia:'',quemRecebe:'',situacao:'Tudo conforme',observacao:'',qtds:{}};
+      const itemRows = o.itens.map(it=>`
+        <div class="item-recv-row">
+          <div class="n">${esc(it.produto)}</div>
+          <div class="solicitada">Solicitado: ${itemQtyLabel(it.qtdSolicitada, it.unidadeMedida)}</div>
+          <input id="loja-qty-${o.pedidoId}-${it.produtoId}" class="recv-qty" type="number" step="0.1" min="0" value="${esc(form.qtds[it.produtoId] ?? it.qtdSolicitada)}" oninput="setLojaAcompQtd('${o.pedidoId}','${it.produtoId}', this.value)"/>
+        </div>`).join('');
+      return `
+      <div class="order-card">
+        ${header}
+        ${meatWarning(o)}
+        ${itemRows}
+        <div class="form-row" style="margin-top:14px">
+          <div class="field"><label>Motorista que entregou</label><input id="loja-motorista-${o.pedidoId}" type="text" value="${esc(form.quemEnvia)}" oninput="setLojaAcompField('${o.pedidoId}','quemEnvia',this.value)" placeholder="Nome do motorista"/></div>
+          <div class="field"><label>Quem está recebendo</label><input id="loja-recebe-${o.pedidoId}" type="text" value="${esc(form.quemRecebe)}" oninput="setLojaAcompField('${o.pedidoId}','quemRecebe',this.value)"/></div>
+          <div class="field">
+            <label>Situação da entrega</label>
+            <select onchange="setLojaAcompField('${o.pedidoId}','situacao',this.value)">
+              <option ${form.situacao==='Tudo conforme'?'selected':''}>Tudo conforme</option>
+              <option ${form.situacao==='Divergência parcial'?'selected':''}>Divergência parcial</option>
+              <option ${form.situacao==='Divergência total'?'selected':''}>Divergência total</option>
+            </select>
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:14px">
+          <label>Observação (opcional)</label>
+          <input id="loja-obs-${o.pedidoId}" type="text" value="${esc(form.observacao||'')}" oninput="setLojaAcompField('${o.pedidoId}','observacao',this.value)" placeholder="Ex: faltou 1kg de carne, embalagem violada, etc."/>
+        </div>
+        <button class="btn-primary" style="width:auto;padding:10px 22px" onclick="confirmarRecebimentoLoja('${o.pedidoId}')">Confirmar recebimento</button>
+      </div>`;
+    }
+
+    return `
+    <div class="order-card">
+      ${header}
+      <ul>${o.itens.map(it=>`<li>${esc(it.produto)} — enviado ${itemQtyLabel(it.qtdSolicitada, it.unidadeMedida)}${it.qtdRecebida!=='' && it.qtdRecebida!==undefined && it.qtdRecebida!==null?` · recebido ${itemQtyLabel(it.qtdRecebida, it.unidadeMedida)}`:''}</li>`).join('')}</ul>
+      <div class="meta" style="margin-top:8px"><span>Motorista: <b>${esc(o.quemEnvia||'—')}</b> · Recebido por: <b>${esc(o.quemRecebe||'—')}</b></span><span>${o.dataRecebimento ? new Date(o.dataRecebimento).toLocaleString('pt-BR') : ''}</span></div>
+      ${o.observacao?`<p class="muted" style="margin:6px 0 0">Obs: ${esc(o.observacao)}</p>`:''}
+    </div>`;
+  }).join('');
+  return `
+    <div class="toolbar">
+      <select onchange="setLojaAcompStatus(this.value)">
+        ${['Todos','Pendente','Recebido'].map(s=>`<option ${state.lojaAcompStatus===s?'selected':''}>${esc(s)}</option>`).join('')}
+      </select>
+      <button class="small-btn" onclick="loadLojaAcompanhamento()">Atualizar</button>
+    </div>
+    ${state.lojaAcompLoading ? '<p class="muted">Carregando...</p>' : ''}
+    ${!state.lojaAcompLoading && cards.length===0 ? '<div class="empty-state"><div class="display">Nenhum pedido encontrado</div></div>' : ''}
+    ${cards}
+  `;
+}
+
+function renderCartDrawer(){
+  const lines = Object.entries(state.cart).map(([id,qty])=>{
+    const p = state.products.find(pp=>pp.id===id);
+    if(!p) return '';
+    return `
+    <div class="cart-line">
+      ${p.foto?`<img src="${esc(p.foto)}"/>`:`<div style="width:44px;height:44px;border-radius:8px;background:var(--teal-light)"></div>`}
+      <div class="info">
+        <div class="n">${esc(p.nome)}</div>
+        <button class="rm" onclick="setQty('${id}',0)">remover</button>
+      </div>
+      ${qtyControl(p, qty, 'changeQty', 'setQty')}
+    </div>`;
+  }).join('');
+  const canSubmit = state.unidade && state.solicitante.trim() && cartCount()>0;
+  return `
+  <div class="drawer-overlay" onclick="if(event.target===this) toggleCart(false)">
+    <div class="drawer">
+      <header><h3>Seu carrinho</h3><button onclick="toggleCart(false)">✕</button></header>
+      <div class="items">${lines || '<p class="muted">Carrinho vazio.</p>'}</div>
+      <footer>
+        <button class="btn-primary" ${canSubmit?'':'disabled'} onclick="submitOrder()">Enviar pedido</button>
+        ${!canSubmit ? `<p class="hint">Preencha unidade e nome, e adicione itens.</p>` : ''}
+      </footer>
+    </div>
+  </div>`;
+}
+
+/* ================= ESTOQUISTA ================= */
+function setEstoqueUserId(v){ state.estoqueUserId = v; }
+async function tryEstoqueLogin(){
+  if(!state.estoqueUserId) return;
+  const r = await callRpc('login_usuario', {p_id: state.estoqueUserId, p_senha: state.estoqueSenhaInput});
+  if(r.ok && r.data && r.data.length){
+    state.estoqueAuthed = true;
+    state.estoqueUser = r.data[0];
+    render();
+  } else {
+    showToast('Senha incorreta.');
+  }
+}
+function estoqueLogout(){
+  state.estoqueAuthed = false;
+  state.estoqueUser = null;
+  state.estoqueUserId = '';
+  state.estoqueSenhaInput = '';
+  state.estoqueCart = {};
+  render();
+}
+function estoqueCartCount(){ return Object.values(state.estoqueCart).reduce((a,b)=>a+b,0); }
+function estoqueSetQty(id, qty){
+  qty = Math.max(0, round2(qty));
+  if(qty===0) delete state.estoqueCart[id];
+  else state.estoqueCart[id] = qty;
+  render();
+}
+function estoqueChangeQty(id, delta){ estoqueSetQty(id, (state.estoqueCart[id]||0) + delta); }
+function setEstoqueUnidade(v){ state.estoqueUnidade = v; }
+function setEstoqueSearch(v){ state.estoqueSearch=v; render(); }
+function setEstoqueCategoria(c){ state.estoqueCategoria=c; render(); }
+function toggleEstoqueCart(open){ state.estoqueCartOpen = open; render(); }
+
+async function submitEstoqueOrder(){
+  if(!state.estoqueUnidade || estoqueCartCount()===0) return;
+  const itens = Object.entries(state.estoqueCart).map(([id, qtd])=>{
+    const p = state.products.find(pp=>pp.id===id);
+    return {id, nome: p ? p.nome : id, qtd, unidade: p ? (p.unidadeMedida||'un') : 'un'};
+  });
+  const order = {
+    id: uid('ped'),
+    unidade: state.estoqueUnidade,
+    solicitante: state.estoqueUser.nome,
+    origem: 'estoquista',
+    tipoPedido: state.estoqueCarneFlag ? 'carne' : 'geral',
+    itens,
+    data: new Date().toISOString()
+  };
+  const r = await callRpc('criar_pedido', {p_id: order.id, p_unidade: order.unidade, p_solicitante: order.solicitante, p_origem: order.origem, p_tipo_pedido: order.tipoPedido, p_itens: itens});
+  if(!r.ok){ showToast('Falha ao enviar o pedido: ' + r.error); return; }
+  state.estoqueCart = {};
+  state.estoqueCartOpen = false;
+  state.estoqueCarneFlag = false;
+  state.estoqueConfirmed = order;
+  render();
+}
+function newEstoqueOrder(){ state.estoqueConfirmed = null; render(); }
+
+function renderEstoque(){
+  if(!state.estoqueAuthed){
+    const opts = state.users.filter(u=>u.papel==='estoquista').map(u=>`<option value="${u.id}" ${state.estoqueUserId===u.id?'selected':''}>${esc(u.nome)}</option>`).join('');
+    if(!state.users.some(u=>u.papel==='estoquista')){
+      return `<div class="empty-state"><div class="display">Nenhum estoquista cadastrado</div><div>Peça ao administrador para criar um usuário em Admin → Usuários.</div></div>`;
+    }
+    return `
+      <div class="login-gate">
+        <span class="eyebrow">Área do estoquista</span>
+        <h2 class="display">Identifique-se</h2>
+        <select onchange="setEstoqueUserId(this.value)">
+          <option value="" ${!state.estoqueUserId?'selected':''} disabled>Selecione seu nome</option>
+          ${opts}
+        </select>
+        <input type="password" placeholder="Senha" value="${esc(state.estoqueSenhaInput)}" oninput="state.estoqueSenhaInput=this.value" onkeydown="if(event.key==='Enter') tryEstoqueLogin()"/>
+        <button class="btn-primary" onclick="tryEstoqueLogin()">Entrar</button>
+      </div>`;
+  }
+
+  const subTab = state.estoqueSubTab || 'novo';
+  return `
+    <div class="subtabs">
+      <button class="${subTab==='novo'?'active':''}" onclick="setEstoqueSubTab('novo')">Novo pedido</button>
+      <button class="${subTab==='acompanhar'?'active':''}" onclick="setEstoqueSubTab('acompanhar')">Acompanhar entregas</button>
+    </div>
+    ${subTab==='novo' ? renderEstoqueNovoPedido() : renderEstoqueAcompanhar()}
+  `;
+}
+
+function setEstoqueSubTab(t){
+  state.estoqueSubTab = t;
+  if(t==='acompanhar') loadEstoqueAcompanhamento(); else render();
+}
+
+async function loadEstoqueAcompanhamento(){
+  state.estoqueAcompLoading = true; render();
+  if(state.supabaseUrl && state.supabaseKey){
+    const unidade = state.estoqueAcompUnidade==='Todas' ? '' : state.estoqueAcompUnidade;
+    const status = state.estoqueAcompStatus==='Todos' ? '' : state.estoqueAcompStatus;
+    const tipoPedido = state.estoqueAcompTipo==='Todos' ? '' : (state.estoqueAcompTipo==='Carne' ? 'carne' : 'geral');
+    const r = await callRpc('listar_pedidos', {p_unidade: unidade, p_status: status, p_tipo_pedido: tipoPedido});
+    state.estoqueAcompData = r.ok ? (r.data||[]) : [];
+    if(!r.ok) showToast('Não foi possível carregar: ' + r.error);
+  } else {
+    state.estoqueAcompData = [];
+  }
+  state.estoqueAcompData.sort((a,b)=> new Date(b.data) - new Date(a.data));
+  state.estoqueAcompLoading = false;
+  render();
+}
+function setEstoqueAcompFiltro(field, value){
+  state[field] = value;
+  loadEstoqueAcompanhamento();
+}
+function exportEstoqueAcompanhamento(){
+  exportXLSX(buildPedidosExportRows(state.estoqueAcompData), `pedidos_paulus_${Date.now()}.xlsx`);
+}
+
+function renderEstoqueAcompanhar(){
+  if(!state.supabaseUrl || !state.supabaseKey){
+    return `<div class="empty-state"><div class="display">Integração não configurada</div><div>Peça ao administrador para conectar a planilha do Google em Admin → Integração.</div></div>`;
+  }
+  const unidadeOptions = ['Todas', ...state.units.map(u=>u.nome)].map(n=>`<option ${state.estoqueAcompUnidade===n?'selected':''}>${esc(n)}</option>`).join('');
+  const cards = state.estoqueAcompData.map(o=>`
+    <div class="order-card">
+      <div class="meta">
+        <span><span class="origem-tag">${o.origem==='estoquista'?'Estoquista':'Unidade'}</span> ${o.tipoPedido==='carne'?'<span class="origem-tag" style="background:var(--gold-light);color:#8a6a1f">🥩 Carne</span>':''} ${editedTag(o)} &nbsp;<b>${esc(o.unidade)}</b> · ${esc(o.solicitante)}</span>
+        <span class="status-pill ${o.status==='Recebido'?'recebido':'pendente'}">${esc(o.status||'Pendente')}</span>
+      </div>
+      ${editedBanner(o)}
+      <ul>${o.itens.map(it=>`<li>${esc(it.produto)} — enviado ${itemQtyLabel(it.qtdSolicitada, it.unidadeMedida)}${it.qtdRecebida!=='' && it.qtdRecebida!==undefined && it.qtdRecebida!==null?` · recebido ${itemQtyLabel(it.qtdRecebida, it.unidadeMedida)}`:''}</li>`).join('')}</ul>
+      ${o.status==='Recebido' ? `<div class="meta" style="margin-top:8px"><span>Motorista: <b>${esc(o.quemEnvia||'—')}</b> · Recebido por: <b>${esc(o.quemRecebe||'—')}</b>${o.situacao?` · Situação: <b>${esc(o.situacao)}</b>`:''}</span><span>${o.dataRecebimento ? new Date(o.dataRecebimento).toLocaleString('pt-BR') : ''}</span></div>${o.observacao?`<p class="muted" style="margin:6px 0 0">Obs: ${esc(o.observacao)}</p>`:''}` : ''}
+    </div>`).join('');
+  return `
+    <div class="toolbar">
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <select onchange="setEstoqueAcompFiltro('estoqueAcompUnidade', this.value)">${unidadeOptions}</select>
+        <select onchange="setEstoqueAcompFiltro('estoqueAcompStatus', this.value)">
+          ${['Todos','Pendente','Recebido'].map(s=>`<option ${state.estoqueAcompStatus===s?'selected':''}>${esc(s)}</option>`).join('')}
+        </select>
+        <select onchange="setEstoqueAcompFiltro('estoqueAcompTipo', this.value)">
+          ${['Todos','Carne','Geral'].map(s=>`<option ${state.estoqueAcompTipo===s?'selected':''}>${esc(s)}</option>`).join('')}
+        </select>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="small-btn" onclick="loadEstoqueAcompanhamento()">Atualizar</button>
+        <button class="small-btn" onclick="exportEstoqueAcompanhamento()">Exportar XLSX</button>
+      </div>
+    </div>
+    ${state.estoqueAcompLoading ? '<p class="muted">Carregando...</p>' : ''}
+    ${!state.estoqueAcompLoading && cards.length===0 ? '<div class="empty-state"><div class="display">Nenhum pedido encontrado</div></div>' : ''}
+    ${cards}
+  `;
+}
+
+function renderEstoqueNovoPedido(){
+  if(state.estoqueConfirmed){
+    const o = state.estoqueConfirmed;
+    return `
+    <div class="confirm">
+      <div class="check">✓</div>
+      <h2 class="display">Pedido enviado!</h2>
+      <p class="muted">Feito por <b>${esc(o.solicitante)}</b> para ${esc(o.unidade)}</p>
+      <p class="muted">${o.itens.length} ${o.itens.length===1?'item':'itens'} registrados.</p>
+      <button class="btn-primary" style="margin-top:18px" onclick="newEstoqueOrder()">Fazer novo pedido</button>
+    </div>`;
+  }
+
+  const unidadeOptions = state.units.map(u=>`<option ${state.estoqueUnidade===u.nome?'selected':''}>${esc(u.nome)}</option>`).join('');
+  const categories = ['Todas', ...Array.from(new Set(state.products.map(p=>p.categoria).filter(Boolean)))];
+  const filtered = state.products.filter(p=>{
+    const matchSearch = p.nome.toLowerCase().includes(state.estoqueSearch.toLowerCase());
+    const matchCat = state.estoqueCategoria === 'Todas' || p.categoria === state.estoqueCategoria;
+    return matchSearch && matchCat;
+  });
+
+  const cards = filtered.map(p=>{
+    const qty = state.estoqueCart[p.id] || 0;
+    return `
+    <div class="card">
+      ${productPhoto(p)}
+      <div class="body">
+        <div>
+          ${p.categoria?`<div class="pcat ${p.somenteEstoquista?'restrito':''}">${esc(p.categoria)}${p.somenteEstoquista?' · exclusivo estoque':''}</div>`:(p.somenteEstoquista?'<div class="pcat restrito">Exclusivo estoque</div>':'')}
+          <div class="pname">${esc(p.nome)}</div>
+          ${medidaBadge(p)}
+        </div>
+        ${qtyControl(p, qty, 'estoqueChangeQty', 'estoqueSetQty')}
+      </div>
+    </div>`;
+  }).join('');
+  const gridOrEmpty = filtered.length ? `<div class="grid">${cards}</div>` : `<div class="empty-state"><div class="display">Nenhum produto encontrado</div></div>`;
+  const catPills = categories.map(c=>`<button class="${state.estoqueCategoria===c?'active':''}" onclick="setEstoqueCategoria('${esc(c)}')">${esc(c)}</button>`).join('');
+
+  return `
+    <div class="id-bar">
+      <div class="field"><label>Fazendo pedido como</label><input type="text" value="${esc(state.estoqueUser.nome)}" readonly/></div>
+      <div class="field">
+        <label>Unidade destino</label>
+        <select onchange="setEstoqueUnidade(this.value)">
+          <option value="" ${!state.estoqueUnidade?'selected':''} disabled>Selecione a unidade</option>
+          ${unidadeOptions}
+        </select>
+      </div>
+      <label class="checkbox-row" style="margin:0"><input type="checkbox" ${state.estoqueCarneFlag?'checked':''} onchange="state.estoqueCarneFlag=this.checked"/> 🥩 Pedido de carne</label>
+      <button class="small-btn" onclick="estoqueLogout()">Sair</button>
+    </div>
+    <div class="search-row"><input id="estoque-search-input" type="text" placeholder="Buscar produto..." value="${esc(state.estoqueSearch)}" oninput="setEstoqueSearch(this.value)"/></div>
+    ${categories.length>1?`<div class="cat-pills">${catPills}</div>`:''}
+    ${gridOrEmpty}
+    ${estoqueCartCount()>0 ? `<button class="cart-fab" onclick="toggleEstoqueCart(true)">🛒 Ver carrinho <span class="badge">${estoqueCartCount()}</span></button>` : ''}
+    ${state.estoqueCartOpen ? renderEstoqueCartDrawer() : ''}
+  `;
+}
+
+function renderEstoqueCartDrawer(){
+  const lines = Object.entries(state.estoqueCart).map(([id,qty])=>{
+    const p = state.products.find(pp=>pp.id===id);
+    if(!p) return '';
+    return `
+    <div class="cart-line">
+      ${p.foto?`<img src="${esc(p.foto)}"/>`:`<div style="width:44px;height:44px;border-radius:8px;background:var(--teal-light)"></div>`}
+      <div class="info"><div class="n">${esc(p.nome)}</div><button class="rm" onclick="estoqueSetQty('${id}',0)">remover</button></div>
+      ${qtyControl(p, qty, 'estoqueChangeQty', 'estoqueSetQty')}
+    </div>`;
+  }).join('');
+  const canSubmit = state.estoqueUnidade && estoqueCartCount()>0;
+  return `
+  <div class="drawer-overlay" onclick="if(event.target===this) toggleEstoqueCart(false)">
+    <div class="drawer">
+      <header><h3>Seu carrinho</h3><button onclick="toggleEstoqueCart(false)">✕</button></header>
+      <div class="items">${lines || '<p class="muted">Carrinho vazio.</p>'}</div>
+      <footer>
+        <button class="btn-primary" ${canSubmit?'':'disabled'} onclick="submitEstoqueOrder()">Enviar pedido</button>
+        ${!canSubmit ? `<p class="hint">Selecione a unidade e adicione itens.</p>` : ''}
+      </footer>
+    </div>
+  </div>`;
+}
+
+/* ================= NUTRICIONISTA ================= */
+function setNutriUserId(v){ state.nutriUserId = v; }
+function nutriAllowedUnits(){
+  const u = state.nutriUser;
+  if(!u || !u.unidades || u.unidades.length===0) return state.units;
+  return state.units.filter(un => u.unidades.includes(un.nome));
+}
+async function tryNutriLogin(){
+  if(!state.nutriUserId) return;
+  const r = await callRpc('login_usuario', {p_id: state.nutriUserId, p_senha: state.nutriSenhaInput});
+  if(r.ok && r.data && r.data.length){
+    state.nutriAuthed = true;
+    state.nutriUser = r.data[0];
+    state.nutriUnidade = '';
+    render();
+  } else {
+    showToast('Senha incorreta.');
+  }
+}
+function nutriLogout(){
+  state.nutriAuthed = false;
+  state.nutriUser = null;
+  state.nutriUserId = '';
+  state.nutriSenhaInput = '';
+  state.nutriPedidos = [];
+  state.nutriHistorico = [];
+  state.nutriForms = {};
+  state.nutriSubTab = 'pendentes';
+  render();
+}
+function setNutriSubTab(t){
+  state.nutriSubTab = t;
+  if(t==='historico') loadNutriHistorico(); else loadNutriPedidos();
+}
+function setNutriUnidade(v){
+  state.nutriUnidade = v;
+  if(state.nutriSubTab==='historico') loadNutriHistorico(); else loadNutriPedidos();
+}
+async function loadNutriPedidos(){
+  if(!state.nutriUnidade || !state.supabaseUrl || !state.supabaseKey){ state.nutriPedidos = []; render(); return; }
+  state.nutriLoading = true; render();
+  const r = await callRpc('listar_pedidos', {p_unidade: state.nutriUnidade, p_status: 'Pendente', p_tipo_pedido: ''});
+  state.nutriLoading = false;
+  if(r.ok){
+    state.nutriPedidos = r.data || [];
+    state.nutriPedidos.forEach(p=>{
+      if(!state.nutriForms[p.pedidoId]){
+        const qtds = {};
+        p.itens.forEach(it => qtds[it.produtoId] = it.qtdSolicitada);
+        state.nutriForms[p.pedidoId] = {quemEnvia:'', quemRecebe: state.nutriUser ? state.nutriUser.nome : '', situacao:'Tudo conforme', observacao:'', qtds};
+      }
+    });
+  } else {
+    state.nutriPedidos = [];
+    showToast('Não foi possível carregar os pedidos: ' + r.error);
+  }
+  render();
+}
+async function loadNutriHistorico(){
+  if(!state.nutriUnidade || !state.supabaseUrl || !state.supabaseKey){ state.nutriHistorico = []; render(); return; }
+  state.nutriLoading = true; render();
+  const r = await callRpc('listar_pedidos', {p_unidade: state.nutriUnidade, p_status: 'Recebido', p_tipo_pedido: ''});
+  state.nutriLoading = false;
+  state.nutriHistorico = r.ok ? (r.data||[]) : [];
+  if(!r.ok) showToast('Não foi possível carregar o histórico: ' + r.error);
+  state.nutriHistorico.sort((a,b)=> new Date(b.dataRecebimento||b.data) - new Date(a.dataRecebimento||a.data));
+  render();
+}
+function setNutriField(pedidoId, field, value){ state.nutriForms[pedidoId][field] = value; }
+function setNutriQtd(pedidoId, produtoId, value){ state.nutriForms[pedidoId].qtds[produtoId] = value; }
+async function confirmarRecebimento(pedidoId){
+  const form = state.nutriForms[pedidoId];
+  if(!form.quemEnvia.trim() || !form.quemRecebe.trim()){
+    showToast('Preencha o motorista e a nutricionista responsável.');
+    return;
+  }
+  const pedido = state.nutriPedidos.find(p=>p.pedidoId===pedidoId);
+  const itens = pedido.itens.map(it => ({produtoId: it.produtoId, qtdRecebida: form.qtds[it.produtoId]}));
+  const r = await callRpc('confirmar_recebimento', {p_pedido_id: pedidoId, p_quem_envia: form.quemEnvia.trim(), p_quem_recebe: form.quemRecebe.trim(), p_situacao: form.situacao, p_observacao: (form.observacao||'').trim(), p_itens: itens});
+  if(r.ok){
+    state.nutriPedidos = state.nutriPedidos.filter(p=>p.pedidoId!==pedidoId);
+    delete state.nutriForms[pedidoId];
+    showToast('Recebimento confirmado.');
+    render();
+  } else {
+    showToast('Falha ao confirmar: ' + r.error);
+  }
+}
+
+function itemQtyLabel(qtd, unidade){
+  const u = unidade || 'un';
+  return `${qtd}${u!=='un' ? ' '+u : ''}`;
+}
+
+function renderNutri(){
+  if(!state.nutriAuthed){
+    if(!state.users.some(u=>u.papel==='nutricionista')){
+      return `<div class="empty-state"><div class="display">Nenhuma nutricionista cadastrada</div><div>Peça ao administrador para criar um usuário em Admin → Usuários.</div></div>`;
+    }
+    const opts = state.users.filter(u=>u.papel==='nutricionista').map(u=>`<option value="${u.id}" ${state.nutriUserId===u.id?'selected':''}>${esc(u.nome)}</option>`).join('');
+    return `
+      <div class="login-gate">
+        <span class="eyebrow">Área da nutricionista</span>
+        <h2 class="display">Identifique-se</h2>
+        <select onchange="setNutriUserId(this.value)">
+          <option value="" ${!state.nutriUserId?'selected':''} disabled>Selecione seu nome</option>
+          ${opts}
+        </select>
+        <input type="password" placeholder="Senha" value="${esc(state.nutriSenhaInput)}" oninput="state.nutriSenhaInput=this.value" onkeydown="if(event.key==='Enter') tryNutriLogin()"/>
+        <button class="btn-primary" onclick="tryNutriLogin()">Entrar</button>
+      </div>`;
+  }
+
+  if(!state.supabaseUrl || !state.supabaseKey){
+    return `<div class="empty-state"><div class="display">Integração não configurada</div><div>Peça ao administrador para conectar a planilha do Google em Admin → Integração.</div></div>`;
+  }
+
+  const allowedUnits = nutriAllowedUnits();
+  const unidadeOptions = allowedUnits.map(u=>`<option ${state.nutriUnidade===u.nome?'selected':''}>${esc(u.nome)}</option>`).join('');
+  const subTab = state.nutriSubTab || 'pendentes';
+
+  let listHtml = '';
+  if(subTab==='pendentes'){
+    const cards = state.nutriPedidos.map(p=>{
+      const form = state.nutriForms[p.pedidoId] || {quemEnvia:'',quemRecebe:'',qtds:{}};
+      const itemRows = p.itens.map(it=>`
+        <div class="item-recv-row">
+          <div class="n">${esc(it.produto)}</div>
+          <div class="solicitada">Solicitado: ${itemQtyLabel(it.qtdSolicitada, it.unidadeMedida)}</div>
+          <input id="qty-${p.pedidoId}-${it.produtoId}" class="recv-qty" type="number" step="0.1" min="0" value="${esc(form.qtds[it.produtoId] ?? it.qtdSolicitada)}" oninput="setNutriQtd('${p.pedidoId}','${it.produtoId}', this.value)"/>
+        </div>`).join('');
+      return `
+      <div class="pending-card">
+        <div class="meta">
+          <span><span class="origem-tag">${p.origem==='estoquista'?'Estoquista':'Unidade'}</span> ${p.tipoPedido==='carne'?'<span class="origem-tag" style="background:var(--gold-light);color:#8a6a1f">🥩 Carne</span>':''} ${editedTag(p)} &nbsp;<b>${esc(p.solicitante)}</b> solicitou em ${new Date(p.data).toLocaleString('pt-BR')}</span>
+          <span class="status-pill pendente">Pendente</span>
+        </div>
+        ${editedBanner(p)}
+        ${itemRows}
+        <div class="form-row" style="margin-top:14px">
+          <div class="field"><label>Motorista que entregou</label><input id="motorista-${p.pedidoId}" type="text" value="${esc(form.quemEnvia)}" oninput="setNutriField('${p.pedidoId}','quemEnvia',this.value)" placeholder="Nome do motorista"/></div>
+          <div class="field"><label>Nutricionista responsável</label><input id="recebe-${p.pedidoId}" type="text" value="${esc(form.quemRecebe)}" oninput="setNutriField('${p.pedidoId}','quemRecebe',this.value)"/></div>
+          <div class="field">
+            <label>Situação da entrega</label>
+            <select onchange="setNutriField('${p.pedidoId}','situacao',this.value)">
+              <option ${form.situacao==='Tudo conforme'?'selected':''}>Tudo conforme</option>
+              <option ${form.situacao==='Divergência parcial'?'selected':''}>Divergência parcial</option>
+              <option ${form.situacao==='Divergência total'?'selected':''}>Divergência total</option>
+            </select>
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:14px">
+          <label>Observação (opcional)</label>
+          <input id="obs-${p.pedidoId}" type="text" value="${esc(form.observacao||'')}" oninput="setNutriField('${p.pedidoId}','observacao',this.value)" placeholder="Ex: faltou 1kg de carne, embalagem violada, etc."/>
+        </div>
+        <button class="btn-primary" style="width:auto;padding:10px 22px" onclick="confirmarRecebimento('${p.pedidoId}')">Confirmar recebimento</button>
+      </div>`;
+    }).join('');
+    listHtml = `
+      ${state.nutriLoading ? '<p class="muted">Carregando pedidos da planilha...</p>' : ''}
+      ${!state.nutriLoading && state.nutriUnidade && cards.length===0 ? '<div class="empty-state"><div class="display">Nenhum pedido pendente</div><div>Todos os pedidos desta unidade já foram recebidos.</div></div>' : ''}
+      ${!state.nutriUnidade ? '<p class="muted">Selecione uma unidade para ver os pedidos pendentes.</p>' : ''}
+      ${cards}`;
+  } else {
+    const cards = state.nutriHistorico.map(p=>{
+      const itemRows = p.itens.map(it=>`
+        <div class="item-recv-row">
+          <div class="n">${esc(it.produto)}</div>
+          <div class="qty-compare"><span>Enviado: <b>${itemQtyLabel(it.qtdSolicitada, it.unidadeMedida)}</b></span><span>Recebido: <b>${itemQtyLabel(it.qtdRecebida, it.unidadeMedida)}</b></span></div>
+        </div>`).join('');
+      return `
+      <div class="pending-card">
+        <div class="meta">
+          <span><span class="origem-tag">${p.origem==='estoquista'?'Estoquista':'Unidade'}</span> ${editedTag(p)} &nbsp;<b>${esc(p.solicitante)}</b> solicitou em ${new Date(p.data).toLocaleString('pt-BR')}</span>
+          <span class="status-pill recebido">${esc(p.situacao||'Recebido')}</span>
+        </div>
+        ${editedBanner(p)}
+        ${itemRows}
+        <div class="form-row" style="margin-top:10px">
+          <div class="field"><label>Motorista</label><input type="text" value="${esc(p.quemEnvia||'')}" readonly/></div>
+          <div class="field"><label>Recebido por</label><input type="text" value="${esc(p.quemRecebe||'')}" readonly/></div>
+          <div class="field"><label>Data do recebimento</label><input type="text" value="${p.dataRecebimento ? new Date(p.dataRecebimento).toLocaleString('pt-BR') : '—'}" readonly/></div>
+        </div>
+        ${p.observacao?`<p class="muted" style="margin:0">Obs: ${esc(p.observacao)}</p>`:''}
+      </div>`;
+    }).join('');
+    listHtml = `
+      ${state.nutriLoading ? '<p class="muted">Carregando histórico da planilha...</p>' : ''}
+      ${!state.nutriLoading && state.nutriUnidade && cards.length===0 ? '<div class="empty-state"><div class="display">Nenhum recebimento no histórico</div></div>' : ''}
+      ${!state.nutriUnidade ? '<p class="muted">Selecione uma unidade para ver o histórico.</p>' : ''}
+      ${cards}`;
+  }
+
+  return `
+    <div class="id-bar">
+      <div class="field"><label>Nutricionista</label><input type="text" value="${esc(state.nutriUser.nome)}" readonly/></div>
+      <div class="field">
+        <label>Unidade</label>
+        <select onchange="setNutriUnidade(this.value)">
+          <option value="" ${!state.nutriUnidade?'selected':''} disabled>Selecione a unidade</option>
+          ${unidadeOptions}
+        </select>
+      </div>
+      <button class="small-btn" onclick="${subTab==='historico'?'loadNutriHistorico()':'loadNutriPedidos()'}">Atualizar</button>
+      <button class="small-btn" onclick="nutriLogout()">Sair</button>
+    </div>
+    <div class="subtabs">
+      <button class="${subTab==='pendentes'?'active':''}" onclick="setNutriSubTab('pendentes')">Pendentes</button>
+      <button class="${subTab==='historico'?'active':''}" onclick="setNutriSubTab('historico')">Histórico de recebimento</button>
+    </div>
+    ${listHtml}
+  `;
+}
+
+/* ================= ADMIN ================= */
+async function tryAdminLogin(){
+  const r = await callRpc('login_admin', {p_senha: state.adminPass});
+  if(r.ok && r.data === true){
+    state.adminAuthed = true;
+    refreshAdminData().then(render);
+  } else {
+    showToast(r.ok ? 'Senha incorreta.' : r.error);
+  }
+}
+function adminLogout(){
+  state.adminAuthed = false;
+  state.adminPass = '';
+  state.adminTab = 'produtos';
+  render();
+}
+function setAdminTab(t){ state.adminTab = t; render(); if(t==='pedidos') loadAdminPedidos(); }
+
+function renderAdmin(){
+  if(!state.adminAuthed){
+    return `
+    <div class="login-gate">
+      <span class="eyebrow">Administração</span>
+      <h2 class="display">Área administrativa</h2>
+      <input type="password" placeholder="Senha" oninput="state.adminPass=this.value" onkeydown="if(event.key==='Enter') tryAdminLogin()"/>
+      <button class="btn-primary" onclick="tryAdminLogin()">Entrar</button>
+    </div>`;
+  }
+  return `
+    <div class="toolbar" style="margin-bottom:0">
+      <div class="admin-tabs" style="margin-bottom:0;border-bottom:none">
+        <button class="${state.adminTab==='produtos'?'active':''}" onclick="setAdminTab('produtos')">Produtos</button>
+        <button class="${state.adminTab==='unidades'?'active':''}" onclick="setAdminTab('unidades')">Unidades</button>
+        <button class="${state.adminTab==='usuarios'?'active':''}" onclick="setAdminTab('usuarios')">Usuários</button>
+        <button class="${state.adminTab==='pedidos'?'active':''}" onclick="setAdminTab('pedidos')">Pedidos</button>
+        <button class="${state.adminTab==='integracao'?'active':''}" onclick="setAdminTab('integracao')">Integração</button>
+      </div>
+      <button class="small-btn" onclick="adminLogout()">Sair</button>
+    </div>
+    <div style="border-bottom:1px solid var(--line);margin-bottom:22px"></div>
+    ${state.adminTab==='produtos' ? renderAdminProdutos() : ''}
+    ${state.adminTab==='unidades' ? renderAdminUnidades() : ''}
+    ${state.adminTab==='usuarios' ? renderAdminUsuarios() : ''}
+    ${state.adminTab==='pedidos' ? renderAdminPedidos() : ''}
+    ${state.adminTab==='integracao' ? renderAdminIntegracao() : ''}
+  `;
+}
+
+function openNewProduct(){ state.editingProduct = {id:null, nome:'', categoria:'', foto:'', somenteEstoquista:false, unidadeMedida:'un'}; render(); }
+function openEditProduct(id){ state.editingProduct = {...state.products.find(p=>p.id===id)}; render(); }
+async function saveProduct(){
+  const ep = state.editingProduct;
+  if(!ep.nome.trim()) return;
+  const id = ep.id || uid('p');
+  const r = await callRpc('salvar_produto', {
+    p_admin_senha: state.adminPass, p_id: id, p_nome: ep.nome.trim(), p_categoria: ep.categoria||'',
+    p_foto: ep.foto||'', p_somente_estoquista: !!ep.somenteEstoquista, p_unidade_medida: ep.unidadeMedida||'un'
+  });
+  if(!r.ok){ showToast(r.error || 'Falha ao salvar produto.'); return; }
+  state.editingProduct = null;
+  showToast('Produto salvo.');
+  await refreshCore();
+}
+async function deleteProduct(id){
+  if(!confirm('Excluir este produto?')) return;
+  const r = await callRpc('excluir_produto', {p_admin_senha: state.adminPass, p_id: id});
+  if(!r.ok){ showToast(r.error || 'Falha ao excluir produto.'); return; }
+  showToast('Produto excluído.');
+  await refreshCore();
+}
+
+function renderAdminProdutos(){
+  const rows = state.products.map(p=>`
+    <tr>
+      <td>${p.foto?`<img src="${esc(p.foto)}"/>`:`<div style="width:38px;height:38px;border-radius:7px;background:var(--teal-light)"></div>`}</td>
+      <td>${esc(p.nome)}</td>
+      <td>${esc(p.categoria||'—')}</td>
+      <td>${({un:'Unidade',kg:'Peso (kg)',cx:'Caixa'})[p.unidadeMedida||'un']}</td>
+      <td>${p.somenteEstoquista?'<span class="role-badge">Só estoquista</span>':'<span class="muted">Todos</span>'}</td>
+      <td class="row-actions">
+        <button class="edit" onclick="openEditProduct('${p.id}')">Editar</button>
+        <button class="del" onclick="deleteProduct('${p.id}')">Excluir</button>
+      </td>
+    </tr>`).join('');
+
+  const ep = state.editingProduct;
+  const formPanel = ep ? `
+    <div class="panel">
+      <h3>${ep.id ? 'Editar produto' : 'Novo produto'}</h3>
+      <div class="form-row">
+        <div class="field"><label>Nome</label><input type="text" value="${esc(ep.nome)}" oninput="state.editingProduct.nome=this.value"/></div>
+        <div class="field"><label>Categoria</label><input type="text" value="${esc(ep.categoria)}" oninput="state.editingProduct.categoria=this.value" placeholder="ex: Grãos"/></div>
+        <div class="field"><label>Como é medido</label>
+          <select onchange="state.editingProduct.unidadeMedida=this.value">
+            <option value="un" ${ (ep.unidadeMedida||'un')==='un'?'selected':''}>Unidade (un)</option>
+            <option value="kg" ${ep.unidadeMedida==='kg'?'selected':''}>Peso (kg) — ex: 1kg500g = 1,5</option>
+            <option value="cx" ${ep.unidadeMedida==='cx'?'selected':''}>Caixa (cx)</option>
+          </select>
+        </div>
+        <div class="field" style="flex:2"><label>URL da foto</label><input type="text" value="${esc(ep.foto)}" oninput="state.editingProduct.foto=this.value" placeholder="https://..."/></div>
+      </div>
+      <label class="checkbox-row"><input type="checkbox" ${ep.somenteEstoquista?'checked':''} onchange="state.editingProduct.somenteEstoquista=this.checked"/> Visível apenas para o estoquista (não aparece na Loja)</label>
+      <button class="btn-primary" style="width:auto;padding:10px 22px" onclick="saveProduct()">Salvar produto</button>
+      <button class="btn-secondary" onclick="state.editingProduct=null; render()">Cancelar</button>
+    </div>` : '';
+
+  return `
+    <div class="toolbar">
+      <span class="muted">${state.products.length} produto(s) cadastrado(s)</span>
+      <button class="small-btn" onclick="openNewProduct()">+ Novo produto</button>
+    </div>
+    ${formPanel}
+    <div class="panel">
+      <table class="admin-table">
+        <thead><tr><th>Foto</th><th>Nome</th><th>Categoria</th><th>Medida</th><th>Visibilidade</th><th></th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="6" class="muted">Nenhum produto cadastrado.</td></tr>'}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function addUnit(nome, senha){
+  nome = nome.trim();
+  if(!nome || state.units.some(u=>u.nome===nome)) return;
+  const r = await callRpc('salvar_unidade', {p_admin_senha: state.adminPass, p_id: '', p_nome: nome, p_senha: (senha||'').trim()});
+  if(!r.ok){ showToast(r.error || 'Falha ao salvar unidade.'); return; }
+  showToast('Unidade salva.');
+  await refreshCore();
+}
+async function removeUnit(id){
+  if(!confirm('Excluir esta unidade?')) return;
+  const r = await callRpc('excluir_unidade', {p_admin_senha: state.adminPass, p_id: id});
+  if(!r.ok){ showToast(r.error || 'Falha ao excluir unidade.'); return; }
+  await refreshCore();
+}
+async function updateUnitSenha(id, nome, senha, inputEl){
+  const r = await callRpc('salvar_unidade', {p_admin_senha: state.adminPass, p_id: id, p_nome: nome, p_senha: (senha||'').trim()});
+  if(!r.ok){ showToast(r.error || 'Falha ao atualizar senha.'); return; }
+  showToast('Senha da unidade atualizada.');
+  if(inputEl) inputEl.blur();
+  await refreshCore();
+}
+
+function renderAdminUnidades(){
+  const rows = state.units.map(u=>`
+    <tr>
+      <td>${esc(u.nome)}</td>
+      <td>${u.temSenha ? '<span class="role-badge">Senha definida</span>' : '<span class="muted">Sem senha</span>'}</td>
+      <td><input class="inline-pass" type="text" placeholder="nova senha — Enter p/ salvar" onkeydown="if(event.key==='Enter'){ updateUnitSenha('${u.id}', '${esc(u.nome)}', this.value, this); }"/></td>
+      <td class="row-actions"><button class="del" onclick="removeUnit('${u.id}')">Excluir</button></td>
+    </tr>`).join('');
+  return `
+    <div class="panel">
+      <h3>Unidades e senha de acesso à Loja</h3>
+      <p class="muted">Digite uma nova senha e pressione <b>Enter</b> para salvar. Deixe em branco e pressione Enter para remover a senha da unidade (por segurança, a senha atual nunca é exibida aqui).</p>
+      <table class="admin-table">
+        <thead><tr><th>Unidade</th><th>Status</th><th>Nova senha</th><th></th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="4" class="muted">Nenhuma unidade cadastrada.</td></tr>'}</tbody>
+      </table>
+      <div class="form-row" style="margin-top:16px">
+        <div class="field"><label>Nova unidade</label><input type="text" id="newUnitName" placeholder="Nome da unidade"/></div>
+        <div class="field"><label>Senha (opcional)</label><input type="text" id="newUnitSenha" placeholder="Deixe em branco se não quiser senha"/></div>
+        <button class="small-btn" onclick="const n=document.getElementById('newUnitName'); const s=document.getElementById('newUnitSenha'); addUnit(n.value, s.value); n.value=''; s.value='';">Adicionar</button>
+      </div>
+    </div>
+  `;
+}
+
+function openNewUser(papel){ state.editingUser = {id:null, nome:'', papel: papel||'estoquista', senha:'', unidades:[]}; render(); }
+function openEditUser(id){ state.editingUser = {unidades:[], senha:'', ...state.users.find(u=>u.id===id)}; state.editingUser.senha=''; render(); }
+function toggleUserUnidade(nome, checked){
+  const eu = state.editingUser;
+  const set = new Set(eu.unidades||[]);
+  if(checked) set.add(nome); else set.delete(nome);
+  eu.unidades = Array.from(set);
+}
+async function saveUser(){
+  const eu = state.editingUser;
+  if(!eu.nome.trim()){ showToast('Preencha o nome.'); return; }
+  if(!eu.id && !(eu.senha||'').trim()){ showToast('Defina uma senha para o novo usuário.'); return; }
+  const r = await callRpc('salvar_usuario', {
+    p_admin_senha: state.adminPass, p_id: eu.id || '', p_nome: eu.nome.trim(), p_papel: eu.papel,
+    p_senha: (eu.senha||'').trim() || '__MANTER__', p_unidades: eu.unidades || []
+  });
+  if(!r.ok){ showToast(r.error || 'Falha ao salvar usuário.'); return; }
+  state.editingUser = null;
+  showToast('Usuário salvo.');
+  await refreshCore();
+}
+async function deleteUser(id){
+  if(!confirm('Excluir este usuário?')) return;
+  const r = await callRpc('excluir_usuario', {p_admin_senha: state.adminPass, p_id: id});
+  if(!r.ok){ showToast(r.error || 'Falha ao excluir usuário.'); return; }
+  showToast('Usuário excluído.');
+  await refreshCore();
+}
+
+async function quickSetUserSenha(id, senha, inputEl){
+  const u = state.users.find(x=>x.id===id);
+  if(!u) return;
+  const r = await callRpc('salvar_usuario', {
+    p_admin_senha: state.adminPass, p_id: id, p_nome: u.nome, p_papel: u.papel,
+    p_senha: (senha||'').trim(), p_unidades: u.unidades || []
+  });
+  if(!r.ok){ showToast(r.error || 'Falha ao atualizar senha.'); return; }
+  showToast('Senha do usuário atualizada.');
+  if(inputEl) inputEl.blur();
+  await refreshCore();
+}
+
+function renderAdminUsuarios(){
+  const rows = state.users.map(u=>`
+    <tr>
+      <td>${esc(u.nome)}</td>
+      <td><span class="role-badge">${u.papel==='estoquista'?'Estoquista':'Nutricionista'}</span></td>
+      <td>${u.papel==='nutricionista' ? (u.unidades && u.unidades.length ? esc(u.unidades.join(', ')) : '<span class="muted">Todas as unidades</span>') : '<span class="muted">—</span>'}</td>
+      <td><input class="inline-pass" type="text" placeholder="nova senha — Enter p/ salvar" onkeydown="if(event.key==='Enter'){ quickSetUserSenha('${u.id}', this.value, this); }"/></td>
+      <td class="row-actions">
+        <button class="edit" onclick="openEditUser('${u.id}')">Editar</button>
+        <button class="del" onclick="deleteUser('${u.id}')">Excluir</button>
+      </td>
+    </tr>`).join('');
+
+  const eu = state.editingUser;
+  const unidadesCheckboxes = eu && eu.papel==='nutricionista' ? `
+      <div class="field" style="flex-basis:100%">
+        <label>Unidades com acesso (nenhuma marcada = acesso a todas)</label>
+        <div class="tag-list" style="margin-top:6px">
+          ${state.units.map(u=>`
+            <label class="checkbox-row" style="margin:0 14px 6px 0">
+              <input type="checkbox" ${(eu.unidades||[]).includes(u.nome)?'checked':''} onchange="toggleUserUnidade('${esc(u.nome)}', this.checked)"/> ${esc(u.nome)}
+            </label>`).join('')}
+        </div>
+      </div>` : '';
+
+  const formPanel = eu ? `
+    <div class="panel">
+      <h3>${eu.id ? 'Editar usuário' : 'Novo usuário'}</h3>
+      <div class="form-row">
+        <div class="field"><label>Nome</label><input type="text" value="${esc(eu.nome)}" oninput="state.editingUser.nome=this.value"/></div>
+        <div class="field">
+          <label>Papel</label>
+          <select onchange="state.editingUser.papel=this.value; render()">
+            <option value="estoquista" ${eu.papel==='estoquista'?'selected':''}>Estoquista</option>
+            <option value="nutricionista" ${eu.papel==='nutricionista'?'selected':''}>Nutricionista</option>
+          </select>
+        </div>
+        <div class="field"><label>Senha ${eu.id ? '(deixe em branco para manter a atual)' : ''}</label><input type="text" value="${esc(eu.senha||'')}" oninput="state.editingUser.senha=this.value" placeholder="${eu.id ? 'nova senha (opcional)' : 'defina uma senha'}"/></div>
+        ${unidadesCheckboxes}
+      </div>
+      <button class="btn-primary" style="width:auto;padding:10px 22px" onclick="saveUser()">Salvar usuário</button>
+      <button class="btn-secondary" onclick="state.editingUser=null; render()">Cancelar</button>
+    </div>` : '';
+
+  return `
+    <div class="toolbar">
+      <span class="muted">${state.users.length} usuário(s) cadastrado(s)</span>
+      <button class="small-btn" onclick="openNewUser('estoquista')">+ Novo usuário</button>
+    </div>
+    ${formPanel}
+    <div class="panel">
+      <table class="admin-table">
+        <thead><tr><th>Nome</th><th>Papel</th><th>Unidades</th><th>Nova senha</th><th></th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="5" class="muted">Nenhum usuário cadastrado ainda.</td></tr>'}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function exportXLSX(rows, filename){
+  if(typeof XLSX === 'undefined'){ showToast('Biblioteca de exportação não carregou. Verifique a internet.'); return; }
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = rows[0].map(()=>({wch:20}));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Pedidos');
+  XLSX.writeFile(wb, filename);
+}
+
+async function loadAdminPedidos(){
+  state.adminPedidosLoading = true; render();
+  if(state.supabaseUrl && state.supabaseKey){
+    const unidade = state.adminPedidosUnidade === 'Todas' ? '' : state.adminPedidosUnidade;
+    const status = state.adminPedidosStatus === 'Todos' ? '' : state.adminPedidosStatus;
+    const r = await callRpc('listar_pedidos', {p_unidade: unidade, p_status: status, p_tipo_pedido: ''});
+    state.adminPedidosData = r.ok ? (r.data||[]) : [];
+    if(!r.ok) showToast('Não foi possível carregar: ' + r.error);
+  } else {
+    state.adminPedidosData = [];
+  }
+  if(state.adminPedidosTipo !== 'Todos'){
+    state.adminPedidosData = state.adminPedidosData.filter(o => (o.tipoPedido||'geral') === (state.adminPedidosTipo==='Carne'?'carne':'geral'));
+  }
+  state.adminPedidosData.sort((a,b)=> new Date(b.data) - new Date(a.data));
+  state.adminPedidosLoading = false;
+  render();
+}
+function setAdminPedidosFiltro(field, value){
+  state[field] = value;
+  loadAdminPedidos();
+}
+function buildPedidosExportRows(list){
+  const rows = [['Data do Pedido','Unidade','Tipo de Pedido','Produto','Qtd Enviada','Qtd Recebida','Enviado por (Motorista)','Recebido por (Nutricionista)','Situação','Observação','Status','Data Recebimento']];
+  list.forEach(p=>{
+    p.itens.forEach(it=>{
+      rows.push([
+        new Date(p.data).toLocaleString('pt-BR'),
+        p.unidade,
+        p.tipoPedido==='carne' ? 'Carne' : 'Geral',
+        it.produto + (it.unidadeMedida && it.unidadeMedida!=='un' ? ` (${it.unidadeMedida})` : ''),
+        it.qtdSolicitada,
+        it.qtdRecebida || '',
+        p.quemEnvia || '',
+        p.quemRecebe || '',
+        p.situacao || '',
+        p.observacao || '',
+        p.status || '',
+        p.dataRecebimento ? new Date(p.dataRecebimento).toLocaleString('pt-BR') : ''
+      ]);
+    });
+  });
+  return rows;
+}
+function exportAdminPedidos(){
+  exportXLSX(buildPedidosExportRows(state.adminPedidosData), `pedidos_paulus_${Date.now()}.xlsx`);
+}
+
+/* ---- Editar pedido (admin) ---- */
+function openEditPedido(pedidoId){
+  const p = state.adminPedidosData.find(x=>x.pedidoId===pedidoId);
+  if(!p) return;
+  if(p.status === 'Recebido'){ showToast('Não é possível editar um pedido já recebido.'); return; }
+  state.editingPedido = {
+    pedidoId: p.pedidoId,
+    unidade: p.unidade,
+    solicitante: p.solicitante,
+    itens: p.itens.map(it => ({id: it.produtoId, nome: it.produto, unidade: it.unidadeMedida||'un', qtd: it.qtdSolicitada}))
+  };
+  state.editPedidoAddId = '';
+  render();
+}
+function closeEditPedido(){ state.editingPedido = null; render(); }
+function setEditPedidoQtd(produtoId, value){
+  const ep = state.editingPedido;
+  const it = ep.itens.find(x=>x.id===produtoId);
+  if(it) it.qtd = value;
+}
+function removeEditPedidoItem(produtoId){
+  const ep = state.editingPedido;
+  ep.itens = ep.itens.filter(x=>x.id!==produtoId);
+  render();
+}
+function addEditPedidoItem(){
+  const ep = state.editingPedido;
+  const pid = state.editPedidoAddId;
+  if(!pid) return;
+  if(ep.itens.some(x=>x.id===pid)) return;
+  const prod = state.products.find(p=>p.id===pid);
+  if(!prod) return;
+  ep.itens.push({id: prod.id, nome: prod.nome, unidade: prod.unidadeMedida||'un', qtd: prod.unidadeMedida==='kg' ? 0.5 : 1});
+  state.editPedidoAddId = '';
+  render();
+}
+async function saveEditedPedido(){
+  const ep = state.editingPedido;
+  const itens = ep.itens
+    .map(it => ({id: it.id, nome: it.nome, unidade: it.unidade, qtd: round2(it.qtd)}))
+    .filter(it => it.qtd > 0);
+  if(itens.length === 0){ showToast('O pedido precisa ter ao menos um item.'); return; }
+  const r = await callRpc('editar_pedido', {p_admin_senha: state.adminPass, p_pedido_id: ep.pedidoId, p_itens: itens});
+  if(r.ok){
+    showToast('Pedido atualizado. A nutricionista verá o aviso de alteração.');
+    state.editingPedido = null;
+    loadAdminPedidos();
+  } else {
+    showToast(r.error || 'Falha ao atualizar o pedido.');
+  }
+}
+async function deletePedido(pedidoId){
+  if(!confirm('Excluir este pedido definitivamente? Essa ação não pode ser desfeita.')) return;
+  const r = await callRpc('excluir_pedido', {p_admin_senha: state.adminPass, p_pedido_id: pedidoId});
+  if(r.ok){
+    showToast('Pedido excluído.');
+    loadAdminPedidos();
+  } else {
+    showToast(r.error || 'Falha ao excluir o pedido.');
+  }
+}
+
+function renderEditPedidoPanel(){
+  const ep = state.editingPedido;
+  if(!ep) return '';
+  const availableProducts = state.products.filter(p => !ep.itens.some(it=>it.id===p.id));
+  const rows = ep.itens.map(it=>`
+    <div class="edit-item-row">
+      <div class="n">${esc(it.nome)}</div>
+      <input class="edit-qty" type="number" step="0.1" min="0" value="${it.qtd}" oninput="setEditPedidoQtd('${it.id}', this.value)"/>
+      <span class="muted">${it.unidade!=='un'?esc(it.unidade):''}</span>
+      <button class="rm" onclick="removeEditPedidoItem('${it.id}')">remover</button>
+    </div>`).join('');
+  const addOptions = availableProducts.map(p=>`<option value="${p.id}">${esc(p.nome)}</option>`).join('');
+  return `
+  <div class="drawer-overlay" onclick="if(event.target===this) closeEditPedido()">
+    <div class="drawer">
+      <header><h3>Editar pedido — ${esc(ep.unidade)}</h3><button onclick="closeEditPedido()">✕</button></header>
+      <div class="items">
+        <p class="muted">Solicitado por ${esc(ep.solicitante)}</p>
+        ${rows || '<p class="muted">Nenhum item.</p>'}
+        <div class="form-row" style="margin-top:14px">
+          <div class="field" style="flex:1">
+            <label>Adicionar produto</label>
+            <select onchange="state.editPedidoAddId=this.value">
+              <option value="">Selecione um produto</option>
+              ${addOptions}
+            </select>
+          </div>
+          <button class="small-btn" onclick="addEditPedidoItem()">+ Adicionar</button>
+        </div>
+        <p class="muted" style="margin-top:10px">⚠️ Ao salvar, a nutricionista verá um aviso de que este pedido foi alterado por um administrador.</p>
+      </div>
+      <footer>
+        <button class="btn-primary" onclick="saveEditedPedido()">Salvar alterações</button>
+      </footer>
+    </div>
+  </div>`;
+}
+
+function renderAdminPedidos(){
+  const unidadeFilterOptions = ['Todas', ...state.units.map(u=>u.nome)].map(n=>`<option ${state.adminPedidosUnidade===n?'selected':''}>${esc(n)}</option>`).join('');
+  const cards = state.adminPedidosData.map(o=>`
+    <div class="order-card">
+      <div class="meta">
+        <span><span class="origem-tag">${o.origem==='estoquista'?'Estoquista':'Unidade'}</span> ${o.tipoPedido==='carne'?'<span class="origem-tag" style="background:var(--gold-light);color:#8a6a1f">🥩 Carne</span>':''} ${editedTag(o)} &nbsp;<b>${esc(o.unidade)}</b> · ${esc(o.solicitante)}</span>
+        <span class="status-pill ${o.status==='Recebido'?'recebido':'pendente'}">${esc(o.status==='Recebido' ? (o.situacao||'Recebido') : 'Pendente')}</span>
+      </div>
+      ${editedBanner(o)}
+      <ul>${o.itens.map(it=>`<li>${esc(it.produto)} — enviado ${itemQtyLabel(it.qtdSolicitada, it.unidadeMedida)}${it.qtdRecebida!=='' && it.qtdRecebida!==undefined && it.qtdRecebida!==null?` · recebido ${itemQtyLabel(it.qtdRecebida, it.unidadeMedida)}`:''}</li>`).join('')}</ul>
+      ${o.status==='Recebido' ? `<div class="meta" style="margin-top:8px"><span>Motorista: <b>${esc(o.quemEnvia||'—')}</b> · Recebido por: <b>${esc(o.quemRecebe||'—')}</b></span><span>${o.dataRecebimento ? new Date(o.dataRecebimento).toLocaleString('pt-BR') : ''}</span></div>${o.observacao?`<p class="muted" style="margin:6px 0 0">Obs: ${esc(o.observacao)}</p>`:''}` : ''}
+      <div style="margin-top:10px;display:flex;gap:8px">
+        ${o.status!=='Recebido' ? `<button class="small-btn" onclick="openEditPedido('${o.pedidoId}')">✏️ Editar pedido</button>` : ''}
+        <button class="small-btn" style="color:var(--danger);border-color:var(--danger)" onclick="deletePedido('${o.pedidoId}')">🗑️ Excluir pedido</button>
+      </div>
+    </div>`).join('');
+  return `
+    <div class="toolbar">
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <select onchange="setAdminPedidosFiltro('adminPedidosUnidade', this.value)">${unidadeFilterOptions}</select>
+        <select onchange="setAdminPedidosFiltro('adminPedidosStatus', this.value)">
+          ${['Todos','Pendente','Recebido'].map(s=>`<option ${state.adminPedidosStatus===s?'selected':''}>${esc(s)}</option>`).join('')}
+        </select>
+        <select onchange="setAdminPedidosFiltro('adminPedidosTipo', this.value)">
+          ${['Todos','Carne','Geral'].map(s=>`<option ${state.adminPedidosTipo===s?'selected':''}>${esc(s)}</option>`).join('')}
+        </select>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="small-btn" onclick="loadAdminPedidos()">Atualizar</button>
+        <button class="small-btn" onclick="exportAdminPedidos()">Exportar XLSX</button>
+      </div>
+    </div>
+    ${(!state.supabaseUrl || !state.supabaseKey) ? '<p class="muted">Banco de dados não conectado. Configure em Admin → Integração.</p>' : ''}
+    ${state.adminPedidosLoading ? '<p class="muted">Carregando...</p>' : ''}
+    ${!state.adminPedidosLoading && cards.length===0 ? '<div class="empty-state"><div class="display">Nenhum pedido encontrado</div></div>' : ''}
+    ${cards}
+    ${renderEditPedidoPanel()}
+  `;
+}
+
+function renderAdminIntegracao(){
+  return `
+    <div class="panel">
+      <h3>Banco de dados (Supabase)</h3>
+      <p class="muted">Cole aqui a URL do projeto e a chave "anon public" do seu projeto Supabase (Project Settings → API). A chave anônima é feita para ser pública — a segurança de verdade vem das regras de acesso configuradas no banco, não do sigilo dela. Essas informações ficam guardadas neste navegador.</p>
+      <div class="form-row" style="margin-top:10px">
+        <div class="field" style="flex:1"><label>Project URL</label><input type="text" value="${esc(state.supabaseUrlDraft)}" oninput="state.supabaseUrlDraft=this.value" placeholder="https://xxxxxxxx.supabase.co"/></div>
+      </div>
+      <div class="form-row">
+        <div class="field" style="flex:1"><label>Chave anon public</label><input type="text" value="${esc(state.supabaseKeyDraft)}" oninput="state.supabaseKeyDraft=this.value" placeholder="eyJhbGciOi..."/></div>
+      </div>
+      <button class="btn-primary" style="width:auto;padding:10px 22px" onclick="saveSupabaseConfig()">Salvar</button>
+      <button class="btn-secondary" onclick="testSupabaseConnection()">Testar conexão</button>
+      <div class="integ-status"><span class="dot ${state.supabaseUrl && state.supabaseKey?'ok':''}"></span>${state.supabaseUrl && state.supabaseKey ? 'Integração configurada' : 'Nenhuma integração configurada'}</div>
+    </div>
+    <div class="panel">
+      <h3>Trocar senha do administrador</h3>
+      <div class="form-row">
+        <div class="field">
+          <label>Senha atual</label>
+          <div style="display:flex;gap:6px">
+            <input type="password" id="adminSenhaAtual" placeholder="senha atual" onkeydown="if(event.key==='Enter') trocarSenhaAdmin()"/>
+            <button type="button" class="small-btn" onclick="toggleShowPassword('adminSenhaAtual', this)">👁️</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Nova senha</label>
+          <div style="display:flex;gap:6px">
+            <input type="password" id="adminSenhaNova" placeholder="nova senha" onkeydown="if(event.key==='Enter') trocarSenhaAdmin()"/>
+            <button type="button" class="small-btn" onclick="toggleShowPassword('adminSenhaNova', this)">👁️</button>
+          </div>
+        </div>
+        <button class="small-btn" onclick="trocarSenhaAdmin()">Trocar senha</button>
+      </div>
+    </div>
+  `;
+}
+function toggleShowPassword(inputId, btnEl){
+  const el = document.getElementById(inputId);
+  if(!el) return;
+  if(el.type === 'password'){ el.type = 'text'; btnEl.textContent = '🙈'; }
+  else { el.type = 'password'; btnEl.textContent = '👁️'; }
+}
+async function trocarSenhaAdmin(){
+  const atual = document.getElementById('adminSenhaAtual').value;
+  const nova = document.getElementById('adminSenhaNova').value;
+  if(!nova.trim()){ showToast('Digite a nova senha.'); return; }
+  const r = await callRpc('alterar_senha_admin', {p_senha_atual: atual, p_senha_nova: nova});
+  if(r.ok){
+    state.adminPass = nova;
+    showToast('Senha do administrador atualizada.');
+    render();
+  } else {
+    showToast(r.error || 'Falha ao trocar a senha.');
+  }
+}
+
+/* ---------------- main render ---------------- */
+function renderTopbar(){
+  let who = '';
+  if(state.view==='estoque' && state.estoqueAuthed) who = `<div class="who-badge">Estoquista: <b>${esc(state.estoqueUser.nome)}</b> <button onclick="estoqueLogout()">sair</button></div>`;
+  if(state.view==='nutri' && state.nutriAuthed) who = `<div class="who-badge">Nutricionista: <b>${esc(state.nutriUser.nome)}</b> <button onclick="nutriLogout()">sair</button></div>`;
+  return `
+  <header class="topbar">
+    <div class="brand">
+      <img src="${LOGO}" alt="Paulu's"/>
+      <div class="brand-text">
+        <span class="eyebrow">Restaurantes Empresariais</span>
+        <span class="name">Pedidos</span>
+      </div>
+    </div>
+    ${who}
+    <div class="nav-toggle">
+      <button class="${state.view==='loja'?'active':''}" onclick="switchView('loja')">Loja</button>
+      <button class="${state.view==='estoque'?'active':''}" onclick="switchView('estoque')">Estoquista</button>
+      <button class="${state.view==='nutri'?'active':''}" onclick="switchView('nutri')">Nutricionista</button>
+      <button class="${state.view==='admin'?'active':''}" onclick="switchView('admin')">Admin</button>
+    </div>
+    <button class="small-btn" onclick="manualRefresh()" title="Recarrega produtos, unidades, usuários e a planilha">🔄 Carregar planilha</button>
+  </header>`;
+}
+
+function render(){
+  // Preserva o foco e a posição do cursor do campo que o usuário estiver digitando,
+  // já que o app re-renderiza a tela inteira a cada mudança de estado.
+  const active = document.activeElement;
+  const activeId = (active && active.id) ? active.id : null;
+  const selStart = (active && typeof active.selectionStart === 'number') ? active.selectionStart : null;
+  const selEnd = (active && typeof active.selectionEnd === 'number') ? active.selectionEnd : null;
+
+  const app = document.getElementById('app');
+  let body = '';
+  if(state.view==='loja') body = renderLoja();
+  else if(state.view==='estoque') body = renderEstoque();
+  else if(state.view==='nutri') body = renderNutri();
+  else body = renderAdmin();
+
+  app.innerHTML = `
+    ${renderTopbar()}
+    <main>${body}</main>
+    ${state.toast ? `<div class="toast">${esc(state.toast)}</div>` : ''}
+  `;
+
+  if(activeId){
+    const el = document.getElementById(activeId);
+    if(el){
+      el.focus();
+      if(selStart !== null && el.setSelectionRange){
+        try{ el.setSelectionRange(selStart, selEnd); }catch(e){}
+      }
+    }
+  }
+}
+
+init();
+</script>
+</body>
+</html>
