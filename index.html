@@ -271,7 +271,7 @@ async function callRpc(fn, params){
   if(!sb) return {ok:false, error:'Supabase não configurado.'};
   try{
     const { data, error } = await sb.rpc(fn, params);
-    if(error) return {ok:false, error: error.message};
+    if(error) return {ok:false, error: error.code ? error.message : 'Falha de conexão com o Supabase.'};
     return {ok:true, data};
   }catch(e){
     return {ok:false, error: 'Falha de conexão com o Supabase.'};
@@ -380,8 +380,8 @@ function uid(prefix){ return prefix + '_' + Date.now().toString(36) + Math.rando
 // Credenciais padrão do projeto Supabase (a chave "publishable/anon" é
 // pública por design — pode ficar aqui sem problema; a segurança de verdade
 // está nas regras do banco). Ainda dá pra trocar em Admin > Integração.
-const DEFAULT_SUPABASE_URL = 'https://zmfjvbvtmxwealsbxtgh.supabase.co';
-const DEFAULT_SUPABASE_KEY = 'sb_publishable_Ob9R2uUhRWJG77yS5KnngQ_fynioD-N';
+const DEFAULT_SUPABASE_URL = 'https://uzznxbnbhsbpwgbhlesj.supabase.co';
+const DEFAULT_SUPABASE_KEY = 'sb_publishable_vILjzn_Q9LcRshjieb6y1g_hN8uhFTu';
 
 async function init(){
   const saved = JSON.parse(localStorageSafeGet('paulus_supabase_config') || 'null');
