@@ -6,7 +6,7 @@
 <title>Paulu's — Pedidos</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <style>
   :root{
@@ -174,7 +174,7 @@
     width:64px;height:64px;border-radius:50%;background:var(--teal-light);color:var(--teal-deep);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-size:30px;
   }
 
-  /* ---- Login gates (loja/estoque/nutri/admin) ---- */
+  /* ---- Login gates (loja/estoque/admin) ---- */
   .login-gate{max-width:360px;margin:70px auto;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:32px;box-shadow:var(--shadow);text-align:center;}
   .login-gate .eyebrow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);font-weight:700;}
   .login-gate select,.login-gate input{width:100%;text-align:center;margin:8px 0;}
@@ -217,7 +217,39 @@
   .item-recv-row input.recv-qty{width:70px;border:1px solid var(--line);border-radius:8px;padding:8px;text-align:center;font-size:14px;}
   .status-pill{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:4px 10px;border-radius:999px;}
   .status-pill.pendente{background:var(--gold-light);color:#8a6a1f;}
+  .status-pill.parcial{background:#fde3d3;color:#a35a1f;}
+  .status-pill.enviado{background:#d9e9f5;color:#1f5f8a;}
   .status-pill.recebido{background:var(--teal-light);color:var(--teal-deep);}
+
+  /* ---- Lojinhas (categorias) ---- */
+  .lojinha-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px;margin-top:10px;}
+  .lojinha-card{
+    background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:22px 16px;
+    text-align:center;box-shadow:var(--shadow);display:flex;flex-direction:column;align-items:center;gap:10px;
+  }
+  .lojinha-card:hover{transform:translateY(-2px);}
+  .lojinha-card .ic{width:44px;height:44px;border-radius:50%;background:var(--teal-light);color:var(--teal-deep);display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:700;}
+  .lojinha-card .nm{font-weight:700;font-size:14px;color:var(--ink);}
+  .lojinha-card .ct{font-size:11.5px;color:var(--ink-soft);}
+  .lojinha-open-tag{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:var(--gold-light);color:#8a6a1f;border-radius:999px;padding:2px 9px;}
+  .lojinha-header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+  .lojinha-header .tag{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;background:var(--teal-light);color:var(--teal-deep);padding:5px 12px;border-radius:999px;}
+
+  /* ---- Observação por item (carrinho) ---- */
+  .cart-line{align-items:flex-start;flex-wrap:wrap;}
+  .cart-line .obs-input{
+    width:100%;margin-top:6px;border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-size:12px;background:var(--cream);
+  }
+  .cart-line .obs-input:focus{outline:none;border-color:var(--teal);}
+
+  /* ---- Item: marcar enviado (estoquista) ---- */
+  .item-send-row{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px dashed var(--line);flex-wrap:wrap;}
+  .item-send-row:last-of-type{border-bottom:none;}
+  .item-send-row .n{flex:1;min-width:140px;font-size:13.5px;font-weight:600;}
+  .item-send-row .n .obs{display:block;font-size:11.5px;font-weight:400;color:var(--ink-soft);margin-top:2px;}
+  .item-send-toggle{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--ink-soft);}
+  .item-send-toggle input{width:16px;height:16px;}
+  .item-send-toggle .dt{font-size:10.5px;color:var(--ink-soft);font-weight:400;}
   .origem-tag{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--teal-light);color:var(--teal-deep);text-transform:uppercase;letter-spacing:.03em;}
   .edit-tag{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;background:#fde3e0;color:#a3402f;text-transform:uppercase;letter-spacing:.03em;}
   .edit-banner{background:#fdf1e8;border:1px solid #f0c9a8;color:#8a4a1f;font-size:12.5px;font-weight:600;padding:8px 12px;border-radius:8px;margin-bottom:10px;}
@@ -295,17 +327,19 @@ const MEDIDAS = {un:'un', kg:'kg', cx:'cx'};
 function round2(n){ return Math.round((parseFloat(n)||0)*100)/100; }
 
 let state = {
-  view: 'loja', // loja | estoque | nutri | admin
+  view: 'loja', // loja | estoque | admin
   products: [],
   units: [],
-  users: [], // {id, nome, papel:'estoquista'|'nutricionista', unidades}
+  users: [], // {id, nome, papel:'estoquista', unidades}
 
-  // Loja
-  cart: {},
+  // Loja (unidade) — agora organizada em "lojinhas" (uma por categoria).
+  // Só pode ter um pedido em aberto por categoria, mas várias categorias
+  // podem estar em andamento ao mesmo tempo.
+  cartsByLojinha: {}, // {categoria: {itens:{produtoId:qtd}, obs:{produtoId:texto}}} — um carrinho por lojinha, dá pra ter vários em aberto
+  lojinha: '', // categoria da lojinha aberta no momento (vazio = tela de escolha)
   unidade: '',
   solicitante: '',
   search: '',
-  categoria: 'Todas',
   cartOpen: false,
   confirmed: null,
   lojaUnlocked: false,
@@ -313,7 +347,6 @@ let state = {
   lojaAcompStatus: 'Todos',
   lojaAcompData: [],
   lojaAcompLoading: false,
-  lojaAcompForms: {},
   lojaSenhaInput: '',
 
   // Estoquista
@@ -323,6 +356,7 @@ let state = {
   estoqueSenhaInput: '',
   estoqueUnidade: '',
   estoqueCart: {},
+  estoqueCartObs: {},
   estoqueSearch: '',
   estoqueCategoria: 'Todas',
   estoqueCartOpen: false,
@@ -334,18 +368,7 @@ let state = {
   estoqueAcompTipo: 'Todos',
   estoqueAcompData: [],
   estoqueAcompLoading: false,
-
-  // Nutricionista
-  nutriAuthed: false,
-  nutriUser: null,
-  nutriUserId: '',
-  nutriSenhaInput: '',
-  nutriUnidade: '',
-  nutriLoading: false,
-  nutriPedidos: [],
-  nutriHistorico: [],
-  nutriSubTab: 'pendentes',
-  nutriForms: {},
+  estoqueRecvForms: {}, // formulário de confirmar recebimento por pedido
 
   // Admin
   adminAuthed: false,
@@ -355,6 +378,7 @@ let state = {
   editingUser: null,
   editingPedido: null,
   editPedidoAddId: '',
+  adminProdutosCategoria: 'Todas',
   toast: null,
   supabaseUrl: '',
   supabaseKey: '',
@@ -445,6 +469,8 @@ function setUnidade(v){
   state.lojaUnlocked = false;
   state.lojaSenhaInput = '';
   state.lojaSubTab = 'pedido';
+  state.lojinha = '';
+  state.cartsByLojinha = {};
   render();
 }
 async function tryLojaLogin(){
@@ -460,18 +486,36 @@ function lojaLogout(){
   state.lojaUnlocked = false;
   state.lojaSenhaInput = '';
   state.solicitante = '';
-  state.cart = {};
+  state.lojinha = '';
+  state.cartsByLojinha = {};
   state.lojaSubTab = 'pedido';
   render();
 }
-function cartCount(){ return Object.values(state.cart).reduce((a,b)=>a+b,0); }
+
+/* ---- Carrinho por lojinha: cada categoria tem seu próprio carrinho,
+   então dá pra deixar um pedido de papelaria pela metade, ir comprar
+   utensílios, e voltar depois — sem perder nada. ---- */
+function currentCart(){
+  if(!state.lojinha) return {itens:{}, obs:{}};
+  if(!state.cartsByLojinha[state.lojinha]) state.cartsByLojinha[state.lojinha] = {itens:{}, obs:{}};
+  return state.cartsByLojinha[state.lojinha];
+}
+function cartCount(){ return Object.values(currentCart().itens).reduce((a,b)=>a+b,0); }
+function lojinhaCartCount(cat){
+  const c = state.cartsByLojinha[cat];
+  return c ? Object.values(c.itens).reduce((a,b)=>a+b,0) : 0;
+}
 function setQty(id, qty){
   qty = Math.max(0, round2(qty));
-  if(qty === 0) delete state.cart[id];
-  else state.cart[id] = qty;
+  const c = currentCart();
+  if(qty === 0){ delete c.itens[id]; delete c.obs[id]; }
+  else c.itens[id] = qty;
   render();
 }
-function changeQty(id, delta){ setQty(id, (state.cart[id]||0) + delta); }
+function changeQty(id, delta){ setQty(id, (currentCart().itens[id]||0) + delta); }
+function setCartObs(id, v){ currentCart().obs[id] = v; }
+function openLojinha(cat){ state.lojinha = cat; state.search=''; render(); }
+function backToLojinhas(){ state.lojinha = ''; state.search=''; render(); }
 
 function stepFor(p){ return p && p.unidadeMedida === 'kg' ? 0.5 : 1; }
 function qtyControl(p, qty, incFnName, setFnName){
@@ -499,10 +543,11 @@ function medidaBadge(p){
 }
 
 async function submitOrder(){
-  if(!state.unidade || !state.solicitante.trim() || cartCount()===0) return;
-  const itens = Object.entries(state.cart).map(([id, qtd])=>{
+  const cart = currentCart();
+  if(!state.unidade || !state.solicitante.trim() || cartCount()===0 || !state.lojinha) return;
+  const itens = Object.entries(cart.itens).map(([id, qtd])=>{
     const p = state.products.find(pp=>pp.id===id);
-    return {id, nome: p ? p.nome : id, qtd, unidade: p ? (p.unidadeMedida||'un') : 'un'};
+    return {id, nome: p ? p.nome : id, qtd, unidade: p ? (p.unidadeMedida||'un') : 'un', observacao: (cart.obs[id]||'').trim()};
   });
   const order = {
     id: uid('ped'),
@@ -510,21 +555,21 @@ async function submitOrder(){
     solicitante: state.solicitante.trim(),
     origem: 'loja',
     tipoPedido: 'geral',
+    categoria: state.lojinha,
     itens,
     data: new Date().toISOString()
   };
-  const r = await callRpc('criar_pedido', {p_id: order.id, p_unidade: order.unidade, p_solicitante: order.solicitante, p_origem: order.origem, p_tipo_pedido: order.tipoPedido, p_itens: itens});
+  const r = await callRpc('criar_pedido', {p_id: order.id, p_unidade: order.unidade, p_solicitante: order.solicitante, p_origem: order.origem, p_tipo_pedido: order.tipoPedido, p_categoria: order.categoria, p_itens: itens});
   if(!r.ok){ showToast('Falha ao enviar o pedido: ' + r.error); return; }
-  state.cart = {};
+  delete state.cartsByLojinha[state.lojinha];
   state.cartOpen = false;
   state.confirmed = order;
   render();
 }
-function newOrder(){ state.confirmed = null; state.solicitante=''; render(); }
+function newOrder(){ state.confirmed = null; state.lojinha=''; render(); }
 function toggleCart(open){ state.cartOpen = open; render(); }
 function setSolicitante(v){ state.solicitante = v; }
 function setSearch(v){ state.search = v; render(); }
-function setCategoria(c){ state.categoria = c; render(); }
 
 function productPhoto(p){
   if(p.foto) return `<div class="photo" style="background-image:url('${esc(p.foto)}')"></div>`;
@@ -539,7 +584,7 @@ function renderLoja(){
       <div class="check">✓</div>
       <h2 class="display">Pedido enviado!</h2>
       <p class="muted">Solicitado por <b>${esc(o.solicitante)}</b> — ${esc(o.unidade)}</p>
-      <p class="muted">${o.itens.length} ${o.itens.length===1?'item':'itens'} registrados.</p>
+      <p class="muted">Lojinha: <b>${esc(o.categoria)}</b> · ${o.itens.length} ${o.itens.length===1?'item':'itens'} registrados.</p>
       <button class="btn-primary" style="margin-top:18px" onclick="newOrder()">Fazer novo pedido</button>
     </div>`;
   }
@@ -581,47 +626,8 @@ function renderLoja(){
     `;
   }
 
-  const visibleProducts = state.products.filter(p=>!p.somenteEstoquista);
-  const categories = ['Todas', ...Array.from(new Set(visibleProducts.map(p=>p.categoria).filter(Boolean)))];
-  const filtered = visibleProducts.filter(p=>{
-    const matchSearch = p.nome.toLowerCase().includes(state.search.toLowerCase());
-    const matchCat = state.categoria === 'Todas' || p.categoria === state.categoria;
-    return matchSearch && matchCat;
-  });
-
-  const cards = filtered.map(p=>{
-    const qty = state.cart[p.id] || 0;
-    return `
-    <div class="card">
-      ${productPhoto(p)}
-      <div class="body">
-        <div>
-          ${p.categoria?`<div class="pcat">${esc(p.categoria)}</div>`:''}
-          <div class="pname">${esc(p.nome)}</div>
-          ${medidaBadge(p)}
-        </div>
-        ${qtyControl(p, qty, 'changeQty', 'setQty')}
-      </div>
-    </div>`;
-  }).join('');
-
-  const gridOrEmpty = filtered.length
-    ? `<div class="grid">${cards}</div>`
-    : `<div class="empty-state"><div class="display">Nenhum produto encontrado</div><div>Tente buscar por outro termo.</div></div>`;
-  const catPills = categories.map(c=>`<button class="${state.categoria===c?'active':''}" onclick="setCategoria('${esc(c)}')">${esc(c)}</button>`).join('');
-
   const subTab = state.lojaSubTab || 'pedido';
-  const pedidoContent = `
-    <div class="search-row">
-      <input id="loja-search-input" type="text" placeholder="Buscar produto..." value="${esc(state.search)}" oninput="setSearch(this.value)"/>
-    </div>
-    ${categories.length>1?`<div class="cat-pills">${catPills}</div>`:''}
-    ${gridOrEmpty}
-    ${cartCount()>0 ? `<button class="cart-fab" onclick="toggleCart(true)">🛒 Ver carrinho <span class="badge">${cartCount()}</span></button>` : ''}
-    ${state.cartOpen ? renderCartDrawer() : ''}
-  `;
-
-  return `
+  const topBar = `
     <div class="id-bar">
       <div class="field">
         <label>Unidade</label>
@@ -636,8 +642,71 @@ function renderLoja(){
     <div class="subtabs">
       <button class="${subTab==='pedido'?'active':''}" onclick="setLojaSubTab('pedido')">Fazer pedido</button>
       <button class="${subTab==='acompanhar'?'active':''}" onclick="setLojaSubTab('acompanhar')">Acompanhar pedidos</button>
+    </div>`;
+
+  if(subTab==='acompanhar') return topBar + renderLojaAcompanhar();
+  if(!state.lojinha) return topBar + renderLojinhaPicker();
+  return topBar + renderLojinhaPedido();
+}
+
+function renderLojinhaPicker(){
+  const visibleProducts = state.products.filter(p=>!p.somenteEstoquista);
+  const categories = Array.from(new Set(visibleProducts.map(p=>p.categoria || 'Outros')));
+  if(categories.length===0){
+    return `<div class="empty-state"><div class="display">Nenhum produto cadastrado</div><div>Peça ao administrador para cadastrar produtos.</div></div>`;
+  }
+  const cards = categories.map(cat=>{
+    const count = visibleProducts.filter(p=>(p.categoria||'Outros')===cat).length;
+    const emAberto = lojinhaCartCount(cat);
+    return `
+    <div class="lojinha-card" onclick="openLojinha('${esc(cat)}')" style="cursor:pointer">
+      <div class="ic">${esc(cat.charAt(0).toUpperCase())}</div>
+      <div class="nm">${esc(cat)}</div>
+      <div class="ct">${count} ${count===1?'produto':'produtos'}</div>
+      ${emAberto>0 ? `<span class="lojinha-open-tag">🛒 ${emAberto} no carrinho</span>` : ''}
+    </div>`;
+  }).join('');
+  return `
+    <p class="muted" style="margin:0 0 4px">Escolha uma lojinha para fazer o pedido — cada categoria vira um pedido separado.</p>
+    <div class="lojinha-grid">${cards}</div>
+  `;
+}
+
+function renderLojinhaPedido(){
+  const cat = state.lojinha;
+  const cart = currentCart();
+  const filtered = state.products.filter(p=>!p.somenteEstoquista && (p.categoria||'Outros')===cat && p.nome.toLowerCase().includes(state.search.toLowerCase()));
+
+  const cards = filtered.map(p=>{
+    const qty = cart.itens[p.id] || 0;
+    return `
+    <div class="card">
+      ${productPhoto(p)}
+      <div class="body">
+        <div>
+          <div class="pname">${esc(p.nome)}</div>
+          ${medidaBadge(p)}
+        </div>
+        ${qtyControl(p, qty, 'changeQty', 'setQty')}
+      </div>
+    </div>`;
+  }).join('');
+
+  const gridOrEmpty = filtered.length
+    ? `<div class="grid">${cards}</div>`
+    : `<div class="empty-state"><div class="display">Nenhum produto encontrado</div><div>Tente buscar por outro termo.</div></div>`;
+
+  return `
+    <div class="lojinha-header">
+      <span class="tag">🏬 ${esc(cat)}</span>
+      <button class="small-btn" onclick="backToLojinhas()">← Trocar de lojinha</button>
     </div>
-    ${subTab==='pedido' ? pedidoContent : renderLojaAcompanhar()}
+    <div class="search-row">
+      <input id="loja-search-input" type="text" placeholder="Buscar produto..." value="${esc(state.search)}" oninput="setSearch(this.value)"/>
+    </div>
+    ${gridOrEmpty}
+    ${cartCount()>0 ? `<button class="cart-fab" onclick="toggleCart(true)">🛒 Ver carrinho <span class="badge">${cartCount()}</span></button>` : ''}
+    ${state.cartOpen ? renderCartDrawer() : ''}
   `;
 }
 
@@ -652,41 +721,24 @@ async function loadLojaAcompanhamento(){
   const r = await callRpc('listar_pedidos', {p_unidade: state.unidade, p_status: status, p_tipo_pedido: ''});
   state.lojaAcompData = r.ok ? (r.data||[]) : [];
   if(!r.ok) showToast('Não foi possível carregar: ' + r.error);
-  state.lojaAcompData.forEach(p=>{
-    if(p.status==='Pendente' && !state.lojaAcompForms[p.pedidoId]){
-      const qtds = {};
-      p.itens.forEach(it => qtds[it.produtoId] = it.qtdSolicitada);
-      state.lojaAcompForms[p.pedidoId] = {quemEnvia:'', quemRecebe:'', situacao:'Tudo conforme', observacao:'', qtds};
-    }
-  });
   state.lojaAcompData.sort((a,b)=> new Date(b.data) - new Date(a.data));
   state.lojaAcompLoading = false;
   render();
 }
 function setLojaAcompStatus(v){ state.lojaAcompStatus = v; loadLojaAcompanhamento(); }
-function setLojaAcompField(pedidoId, field, value){ state.lojaAcompForms[pedidoId][field] = value; }
-function setLojaAcompQtd(pedidoId, produtoId, value){ state.lojaAcompForms[pedidoId].qtds[produtoId] = value; }
 
-async function confirmarRecebimentoLoja(pedidoId){
-  const pedido = state.lojaAcompData.find(p=>p.pedidoId===pedidoId);
-  const form = state.lojaAcompForms[pedidoId];
-  if(!form.quemEnvia.trim() || !form.quemRecebe.trim()){
-    showToast('Preencha o motorista e quem está recebendo.');
-    return;
-  }
-  if(pedido.tipoPedido === 'carne'){
-    const confirmado = confirm('Este pedido tem itens de carne. Você já pesou os itens antes de confirmar o recebimento?');
-    if(!confirmado) return;
-  }
-  const itens = pedido.itens.map(it => ({produtoId: it.produtoId, qtdRecebida: form.qtds[it.produtoId]}));
-  const r = await callRpc('confirmar_recebimento', {p_pedido_id: pedidoId, p_quem_envia: form.quemEnvia.trim(), p_quem_recebe: form.quemRecebe.trim(), p_situacao: form.situacao, p_observacao: (form.observacao||'').trim(), p_itens: itens});
-  if(r.ok){
-    delete state.lojaAcompForms[pedidoId];
-    showToast('Recebimento confirmado.');
-    loadLojaAcompanhamento();
-  } else {
-    showToast('Falha ao confirmar: ' + r.error);
-  }
+function statusPillClass(status){
+  if(status==='Recebido') return 'recebido';
+  if(status==='Enviado') return 'enviado';
+  if(status==='Parcialmente enviado') return 'parcial';
+  return 'pendente';
+}
+function itemStatusLine(it){
+  const parts = [`solicitado ${itemQtyLabel(it.qtdSolicitada, it.unidadeMedida)}`];
+  if(it.enviado) parts.push(`<span style="color:var(--teal-deep);font-weight:600">enviado${it.dataEnvio ? ' em '+new Date(it.dataEnvio).toLocaleDateString('pt-BR') : ''}</span>`);
+  else parts.push(`<span class="muted">aguardando envio</span>`);
+  if(it.qtdRecebida!=='' && it.qtdRecebida!==undefined && it.qtdRecebida!==null) parts.push(`recebido ${itemQtyLabel(it.qtdRecebida, it.unidadeMedida)}`);
+  return parts.join(' · ');
 }
 
 function editedBanner(o){
@@ -706,59 +758,34 @@ function renderLojaAcompanhar(){
   const cards = state.lojaAcompData.map(o=>{
     const header = `
       <div class="meta">
-        <span><span class="origem-tag">${o.origem==='estoquista'?'Estoquista':'Unidade'}</span> ${o.tipoPedido==='carne'?'<span class="origem-tag" style="background:var(--gold-light);color:#8a6a1f">🥩 Carne</span>':''} ${editedTag(o)} &nbsp;${esc(o.solicitante)}</span>
-        <span class="status-pill ${o.status==='Recebido'?'recebido':'pendente'}">${esc(o.status==='Recebido' ? (o.situacao||'Recebido') : 'Pendente')}</span>
+        <span><span class="origem-tag">${o.origem==='estoquista'?'Estoquista':'Unidade'}</span> ${o.categoria?`<span class="origem-tag">${esc(o.categoria)}</span>`:''} ${o.tipoPedido==='carne'?'<span class="origem-tag" style="background:var(--gold-light);color:#8a6a1f">🥩 Carne</span>':''} ${editedTag(o)} &nbsp;${esc(o.solicitante)}</span>
+        <span class="status-pill ${statusPillClass(o.status)}">${esc(o.status==='Recebido' ? (o.situacao||'Recebido') : o.status)}</span>
       </div>
       ${editedBanner(o)}`;
 
-    if(o.status !== 'Recebido'){
-      const form = state.lojaAcompForms[o.pedidoId] || {quemEnvia:'',quemRecebe:'',situacao:'Tudo conforme',observacao:'',qtds:{}};
-      const itemRows = o.itens.map(it=>`
-        <div class="item-recv-row">
-          <div class="n">${esc(it.produto)}</div>
-          <div class="solicitada">Solicitado: ${itemQtyLabel(it.qtdSolicitada, it.unidadeMedida)}</div>
-          <input id="loja-qty-${o.pedidoId}-${it.produtoId}" class="recv-qty" type="number" step="0.1" min="0" value="${esc(form.qtds[it.produtoId] ?? it.qtdSolicitada)}" oninput="setLojaAcompQtd('${o.pedidoId}','${it.produtoId}', this.value)"/>
-        </div>`).join('');
-      return `
-      <div class="order-card">
-        ${header}
-        ${meatWarning(o)}
-        ${itemRows}
-        <div class="form-row" style="margin-top:14px">
-          <div class="field"><label>Motorista que entregou</label><input id="loja-motorista-${o.pedidoId}" type="text" value="${esc(form.quemEnvia)}" oninput="setLojaAcompField('${o.pedidoId}','quemEnvia',this.value)" placeholder="Nome do motorista"/></div>
-          <div class="field"><label>Quem está recebendo</label><input id="loja-recebe-${o.pedidoId}" type="text" value="${esc(form.quemRecebe)}" oninput="setLojaAcompField('${o.pedidoId}','quemRecebe',this.value)"/></div>
-          <div class="field">
-            <label>Situação da entrega</label>
-            <select onchange="setLojaAcompField('${o.pedidoId}','situacao',this.value)">
-              <option ${form.situacao==='Tudo conforme'?'selected':''}>Tudo conforme</option>
-              <option ${form.situacao==='Divergência parcial'?'selected':''}>Divergência parcial</option>
-              <option ${form.situacao==='Divergência total'?'selected':''}>Divergência total</option>
-            </select>
-          </div>
-        </div>
-        <div class="field" style="margin-bottom:14px">
-          <label>Observação (opcional)</label>
-          <input id="loja-obs-${o.pedidoId}" type="text" value="${esc(form.observacao||'')}" oninput="setLojaAcompField('${o.pedidoId}','observacao',this.value)" placeholder="Ex: faltou 1kg de carne, embalagem violada, etc."/>
-        </div>
-        <button class="btn-primary" style="width:auto;padding:10px 22px" onclick="confirmarRecebimentoLoja('${o.pedidoId}')">Confirmar recebimento</button>
-      </div>`;
-    }
+    const itemRows = o.itens.map(it=>`
+      <li>
+        ${esc(it.produto)} — ${itemStatusLine(it)}
+        ${it.observacao ? `<br><span class="muted" style="font-size:12px">Obs: ${esc(it.observacao)}</span>` : ''}
+      </li>`).join('');
 
     return `
     <div class="order-card">
       ${header}
-      <ul>${o.itens.map(it=>`<li>${esc(it.produto)} — enviado ${itemQtyLabel(it.qtdSolicitada, it.unidadeMedida)}${it.qtdRecebida!=='' && it.qtdRecebida!==undefined && it.qtdRecebida!==null?` · recebido ${itemQtyLabel(it.qtdRecebida, it.unidadeMedida)}`:''}</li>`).join('')}</ul>
-      <div class="meta" style="margin-top:8px"><span>Motorista: <b>${esc(o.quemEnvia||'—')}</b> · Recebido por: <b>${esc(o.quemRecebe||'—')}</b></span><span>${o.dataRecebimento ? new Date(o.dataRecebimento).toLocaleString('pt-BR') : ''}</span></div>
-      ${o.observacao?`<p class="muted" style="margin:6px 0 0">Obs: ${esc(o.observacao)}</p>`:''}
+      ${meatWarning(o)}
+      <ul>${itemRows}</ul>
+      ${o.status==='Recebido' ? `<div class="meta" style="margin-top:8px"><span>Motorista: <b>${esc(o.quemEnvia||'—')}</b> · Recebido por: <b>${esc(o.quemRecebe||'—')}</b></span><span>${o.dataRecebimento ? new Date(o.dataRecebimento).toLocaleString('pt-BR') : ''}</span></div>${o.observacao?`<p class="muted" style="margin:6px 0 0">Obs: ${esc(o.observacao)}</p>`:''}` : ''}
+      <div style="margin-top:10px"><button class="small-btn" onclick="exportPedidoPdf('${o.pedidoId}')">📄 Exportar este pedido</button></div>
     </div>`;
   }).join('');
   return `
     <div class="toolbar">
       <select onchange="setLojaAcompStatus(this.value)">
-        ${['Todos','Pendente','Recebido'].map(s=>`<option ${state.lojaAcompStatus===s?'selected':''}>${esc(s)}</option>`).join('')}
+        ${['Todos','Pendente','Parcialmente enviado','Enviado','Recebido'].map(s=>`<option ${state.lojaAcompStatus===s?'selected':''}>${esc(s)}</option>`).join('')}
       </select>
       <button class="small-btn" onclick="loadLojaAcompanhamento()">Atualizar</button>
     </div>
+    <p class="muted" style="margin-top:-6px">Aqui é só acompanhamento — quem confirma o recebimento das entregas agora é o estoquista.</p>
     ${state.lojaAcompLoading ? '<p class="muted">Carregando...</p>' : ''}
     ${!state.lojaAcompLoading && cards.length===0 ? '<div class="empty-state"><div class="display">Nenhum pedido encontrado</div></div>' : ''}
     ${cards}
@@ -766,7 +793,8 @@ function renderLojaAcompanhar(){
 }
 
 function renderCartDrawer(){
-  const lines = Object.entries(state.cart).map(([id,qty])=>{
+  const cart = currentCart();
+  const lines = Object.entries(cart.itens).map(([id,qty])=>{
     const p = state.products.find(pp=>pp.id===id);
     if(!p) return '';
     return `
@@ -777,13 +805,14 @@ function renderCartDrawer(){
         <button class="rm" onclick="setQty('${id}',0)">remover</button>
       </div>
       ${qtyControl(p, qty, 'changeQty', 'setQty')}
+      <input id="cart-obs-${id}" class="obs-input" type="text" placeholder="Observação (opcional)" value="${esc(cart.obs[id]||'')}" oninput="setCartObs('${id}', this.value)"/>
     </div>`;
   }).join('');
   const canSubmit = state.unidade && state.solicitante.trim() && cartCount()>0;
   return `
   <div class="drawer-overlay" onclick="if(event.target===this) toggleCart(false)">
     <div class="drawer">
-      <header><h3>Seu carrinho</h3><button onclick="toggleCart(false)">✕</button></header>
+      <header><h3>Carrinho — ${esc(state.lojinha)}</h3><button onclick="toggleCart(false)">✕</button></header>
       <div class="items">${lines || '<p class="muted">Carrinho vazio.</p>'}</div>
       <footer>
         <button class="btn-primary" ${canSubmit?'':'disabled'} onclick="submitOrder()">Enviar pedido</button>
@@ -812,16 +841,18 @@ function estoqueLogout(){
   state.estoqueUserId = '';
   state.estoqueSenhaInput = '';
   state.estoqueCart = {};
+  state.estoqueCartObs = {};
   render();
 }
 function estoqueCartCount(){ return Object.values(state.estoqueCart).reduce((a,b)=>a+b,0); }
 function estoqueSetQty(id, qty){
   qty = Math.max(0, round2(qty));
-  if(qty===0) delete state.estoqueCart[id];
+  if(qty===0){ delete state.estoqueCart[id]; delete state.estoqueCartObs[id]; }
   else state.estoqueCart[id] = qty;
   render();
 }
 function estoqueChangeQty(id, delta){ estoqueSetQty(id, (state.estoqueCart[id]||0) + delta); }
+function setEstoqueCartObs(id, v){ state.estoqueCartObs[id] = v; }
 function setEstoqueUnidade(v){ state.estoqueUnidade = v; }
 function setEstoqueSearch(v){ state.estoqueSearch=v; render(); }
 function setEstoqueCategoria(c){ state.estoqueCategoria=c; render(); }
@@ -831,20 +862,26 @@ async function submitEstoqueOrder(){
   if(!state.estoqueUnidade || estoqueCartCount()===0) return;
   const itens = Object.entries(state.estoqueCart).map(([id, qtd])=>{
     const p = state.products.find(pp=>pp.id===id);
-    return {id, nome: p ? p.nome : id, qtd, unidade: p ? (p.unidadeMedida||'un') : 'un'};
+    return {id, nome: p ? p.nome : id, qtd, unidade: p ? (p.unidadeMedida||'un') : 'un', observacao: (state.estoqueCartObs[id]||'').trim()};
   });
+  const cats = Array.from(new Set(itens.map(it=>{
+    const p = state.products.find(pp=>pp.id===it.id);
+    return p ? (p.categoria||'Outros') : null;
+  }).filter(Boolean)));
   const order = {
     id: uid('ped'),
     unidade: state.estoqueUnidade,
     solicitante: state.estoqueUser.nome,
     origem: 'estoquista',
     tipoPedido: state.estoqueCarneFlag ? 'carne' : 'geral',
+    categoria: cats.length===1 ? cats[0] : null,
     itens,
     data: new Date().toISOString()
   };
-  const r = await callRpc('criar_pedido', {p_id: order.id, p_unidade: order.unidade, p_solicitante: order.solicitante, p_origem: order.origem, p_tipo_pedido: order.tipoPedido, p_itens: itens});
+  const r = await callRpc('criar_pedido', {p_id: order.id, p_unidade: order.unidade, p_solicitante: order.solicitante, p_origem: order.origem, p_tipo_pedido: order.tipoPedido, p_categoria: order.categoria, p_itens: itens});
   if(!r.ok){ showToast('Falha ao enviar o pedido: ' + r.error); return; }
   state.estoqueCart = {};
+  state.estoqueCartObs = {};
   state.estoqueCartOpen = false;
   state.estoqueCarneFlag = false;
   state.estoqueConfirmed = order;
@@ -898,6 +935,13 @@ async function loadEstoqueAcompanhamento(){
   } else {
     state.estoqueAcompData = [];
   }
+  state.estoqueAcompData.forEach(p=>{
+    if(p.status!=='Recebido' && !state.estoqueRecvForms[p.pedidoId]){
+      const qtds = {};
+      p.itens.forEach(it => qtds[it.produtoId] = it.qtdSolicitada);
+      state.estoqueRecvForms[p.pedidoId] = {quemEnvia:'', quemRecebe:'', situacao:'Tudo conforme', observacao:'', qtds};
+    }
+  });
   state.estoqueAcompData.sort((a,b)=> new Date(b.data) - new Date(a.data));
   state.estoqueAcompLoading = false;
   render();
@@ -906,8 +950,35 @@ function setEstoqueAcompFiltro(field, value){
   state[field] = value;
   loadEstoqueAcompanhamento();
 }
-function exportEstoqueAcompanhamento(){
-  exportXLSX(buildPedidosExportRows(state.estoqueAcompData), `pedidos_paulus_${Date.now()}.xlsx`);
+function setEstoqueRecvField(pedidoId, field, value){ state.estoqueRecvForms[pedidoId][field] = value; }
+function setEstoqueRecvQtd(pedidoId, produtoId, value){ state.estoqueRecvForms[pedidoId].qtds[produtoId] = value; }
+
+async function marcarItemEnviado(pedidoId, produtoId, enviado){
+  const r = await callRpc('marcar_item_enviado', {p_pedido_id: pedidoId, p_produto_id: produtoId, p_enviado: enviado});
+  if(!r.ok){ showToast('Falha ao atualizar: ' + r.error); return; }
+  await loadEstoqueAcompanhamento();
+}
+
+async function confirmarRecebimentoEstoque(pedidoId){
+  const pedido = state.estoqueAcompData.find(p=>p.pedidoId===pedidoId);
+  const form = state.estoqueRecvForms[pedidoId];
+  if(!form.quemEnvia.trim() || !form.quemRecebe.trim()){
+    showToast('Preencha o motorista e quem está recebendo.');
+    return;
+  }
+  if(pedido.tipoPedido === 'carne'){
+    const confirmado = confirm('Este pedido tem itens de carne. Você já pesou os itens antes de confirmar o recebimento?');
+    if(!confirmado) return;
+  }
+  const itens = pedido.itens.map(it => ({produtoId: it.produtoId, qtdRecebida: form.qtds[it.produtoId]}));
+  const r = await callRpc('confirmar_recebimento', {p_pedido_id: pedidoId, p_quem_envia: form.quemEnvia.trim(), p_quem_recebe: form.quemRecebe.trim(), p_situacao: form.situacao, p_observacao: (form.observacao||'').trim(), p_itens: itens});
+  if(r.ok){
+    delete state.estoqueRecvForms[pedidoId];
+    showToast('Recebimento confirmado.');
+    loadEstoqueAcompanhamento();
+  } else {
+    showToast('Falha ao confirmar: ' + r.error);
+  }
 }
 
 function renderEstoqueAcompanhar(){
@@ -915,22 +986,70 @@ function renderEstoqueAcompanhar(){
     return `<div class="empty-state"><div class="display">Integração não configurada</div><div>Peça ao administrador para conectar a planilha do Google em Admin → Integração.</div></div>`;
   }
   const unidadeOptions = ['Todas', ...state.units.map(u=>u.nome)].map(n=>`<option ${state.estoqueAcompUnidade===n?'selected':''}>${esc(n)}</option>`).join('');
-  const cards = state.estoqueAcompData.map(o=>`
-    <div class="order-card">
+  const cards = state.estoqueAcompData.map(o=>{
+    const header = `
       <div class="meta">
-        <span><span class="origem-tag">${o.origem==='estoquista'?'Estoquista':'Unidade'}</span> ${o.tipoPedido==='carne'?'<span class="origem-tag" style="background:var(--gold-light);color:#8a6a1f">🥩 Carne</span>':''} ${editedTag(o)} &nbsp;<b>${esc(o.unidade)}</b> · ${esc(o.solicitante)}</span>
-        <span class="status-pill ${o.status==='Recebido'?'recebido':'pendente'}">${esc(o.status||'Pendente')}</span>
+        <span><span class="origem-tag">${o.origem==='estoquista'?'Estoquista':'Unidade'}</span> ${o.categoria?`<span class="origem-tag">${esc(o.categoria)}</span>`:''} ${o.tipoPedido==='carne'?'<span class="origem-tag" style="background:var(--gold-light);color:#8a6a1f">🥩 Carne</span>':''} ${editedTag(o)} &nbsp;<b>${esc(o.unidade)}</b> · ${esc(o.solicitante)}</span>
+        <span class="status-pill ${statusPillClass(o.status)}">${esc(o.status==='Recebido' ? (o.situacao||'Recebido') : o.status)}</span>
       </div>
-      ${editedBanner(o)}
-      <ul>${o.itens.map(it=>`<li>${esc(it.produto)} — enviado ${itemQtyLabel(it.qtdSolicitada, it.unidadeMedida)}${it.qtdRecebida!=='' && it.qtdRecebida!==undefined && it.qtdRecebida!==null?` · recebido ${itemQtyLabel(it.qtdRecebida, it.unidadeMedida)}`:''}</li>`).join('')}</ul>
-      ${o.status==='Recebido' ? `<div class="meta" style="margin-top:8px"><span>Motorista: <b>${esc(o.quemEnvia||'—')}</b> · Recebido por: <b>${esc(o.quemRecebe||'—')}</b>${o.situacao?` · Situação: <b>${esc(o.situacao)}</b>`:''}</span><span>${o.dataRecebimento ? new Date(o.dataRecebimento).toLocaleString('pt-BR') : ''}</span></div>${o.observacao?`<p class="muted" style="margin:6px 0 0">Obs: ${esc(o.observacao)}</p>`:''}` : ''}
-    </div>`).join('');
+      ${editedBanner(o)}`;
+
+    if(o.status === 'Recebido'){
+      return `
+      <div class="order-card">
+        ${header}
+        <ul>${o.itens.map(it=>`<li>${esc(it.produto)} — ${itemStatusLine(it)}${it.observacao?`<br><span class="muted" style="font-size:12px">Obs: ${esc(it.observacao)}</span>`:''}</li>`).join('')}</ul>
+        <div class="meta" style="margin-top:8px"><span>Motorista: <b>${esc(o.quemEnvia||'—')}</b> · Recebido por: <b>${esc(o.quemRecebe||'—')}</b>${o.situacao?` · Situação: <b>${esc(o.situacao)}</b>`:''}</span><span>${o.dataRecebimento ? new Date(o.dataRecebimento).toLocaleString('pt-BR') : ''}</span></div>
+        ${o.observacao?`<p class="muted" style="margin:6px 0 0">Obs: ${esc(o.observacao)}</p>`:''}
+        <div style="margin-top:10px"><button class="small-btn" onclick="exportPedidoPdf('${o.pedidoId}')">📄 Exportar este pedido</button></div>
+      </div>`;
+    }
+
+    const form = state.estoqueRecvForms[o.pedidoId] || {quemEnvia:'',quemRecebe:'',situacao:'Tudo conforme',observacao:'',qtds:{}};
+    const itemRows = o.itens.map(it=>`
+      <div class="item-send-row">
+        <div class="n">${esc(it.produto)} <span class="muted" style="font-weight:400">— solicitado ${itemQtyLabel(it.qtdSolicitada, it.unidadeMedida)}</span>${it.observacao?`<span class="obs">Obs: ${esc(it.observacao)}</span>`:''}</div>
+        <label class="item-send-toggle">
+          <input type="checkbox" ${it.enviado?'checked':''} onchange="marcarItemEnviado('${o.pedidoId}','${it.produtoId}', this.checked)"/> Enviado
+          ${it.enviado && it.dataEnvio ? `<span class="dt">${new Date(it.dataEnvio).toLocaleDateString('pt-BR')}</span>` : ''}
+        </label>
+        <input class="recv-qty" type="number" step="0.1" min="0" value="${esc(form.qtds[it.produtoId] ?? it.qtdSolicitada)}" oninput="setEstoqueRecvQtd('${o.pedidoId}','${it.produtoId}', this.value)" title="Qtd. recebida (preencher ao confirmar o recebimento final)"/>
+      </div>`).join('');
+
+    return `
+    <div class="order-card">
+      ${header}
+      ${meatWarning(o)}
+      <p class="muted" style="margin:4px 0 8px">Marque cada item como enviado conforme for despachando (podem sair em dias diferentes). Quando tudo chegar na unidade, confirme o recebimento abaixo.</p>
+      ${itemRows}
+      <div class="form-row" style="margin-top:14px">
+        <div class="field"><label>Motorista que entregou</label><input id="estoque-motorista-${o.pedidoId}" type="text" value="${esc(form.quemEnvia)}" oninput="setEstoqueRecvField('${o.pedidoId}','quemEnvia',this.value)" placeholder="Nome do motorista"/></div>
+        <div class="field"><label>Quem está recebendo</label><input id="estoque-recebe-${o.pedidoId}" type="text" value="${esc(form.quemRecebe)}" oninput="setEstoqueRecvField('${o.pedidoId}','quemRecebe',this.value)"/></div>
+        <div class="field">
+          <label>Situação da entrega</label>
+          <select onchange="setEstoqueRecvField('${o.pedidoId}','situacao',this.value)">
+            <option ${form.situacao==='Tudo conforme'?'selected':''}>Tudo conforme</option>
+            <option ${form.situacao==='Divergência parcial'?'selected':''}>Divergência parcial</option>
+            <option ${form.situacao==='Divergência total'?'selected':''}>Divergência total</option>
+          </select>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:14px">
+        <label>Observação (opcional)</label>
+        <input id="estoque-obs-${o.pedidoId}" type="text" value="${esc(form.observacao||'')}" oninput="setEstoqueRecvField('${o.pedidoId}','observacao',this.value)" placeholder="Ex: faltou 1kg de carne, embalagem violada, etc."/>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-primary" style="width:auto;padding:10px 22px" onclick="confirmarRecebimentoEstoque('${o.pedidoId}')">Confirmar recebimento</button>
+        <button class="small-btn" onclick="exportPedidoPdf('${o.pedidoId}')">📄 Exportar este pedido</button>
+      </div>
+    </div>`;
+  }).join('');
   return `
     <div class="toolbar">
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <select onchange="setEstoqueAcompFiltro('estoqueAcompUnidade', this.value)">${unidadeOptions}</select>
         <select onchange="setEstoqueAcompFiltro('estoqueAcompStatus', this.value)">
-          ${['Todos','Pendente','Recebido'].map(s=>`<option ${state.estoqueAcompStatus===s?'selected':''}>${esc(s)}</option>`).join('')}
+          ${['Todos','Pendente','Parcialmente enviado','Enviado','Recebido'].map(s=>`<option ${state.estoqueAcompStatus===s?'selected':''}>${esc(s)}</option>`).join('')}
         </select>
         <select onchange="setEstoqueAcompFiltro('estoqueAcompTipo', this.value)">
           ${['Todos','Carne','Geral'].map(s=>`<option ${state.estoqueAcompTipo===s?'selected':''}>${esc(s)}</option>`).join('')}
@@ -938,7 +1057,7 @@ function renderEstoqueAcompanhar(){
       </div>
       <div style="display:flex;gap:8px">
         <button class="small-btn" onclick="loadEstoqueAcompanhamento()">Atualizar</button>
-        <button class="small-btn" onclick="exportEstoqueAcompanhamento()">Exportar XLSX</button>
+        <button class="small-btn" onclick="exportListaCompras(state.estoqueAcompData)">📄 Exportar lista (PDF)</button>
       </div>
     </div>
     ${state.estoqueAcompLoading ? '<p class="muted">Carregando...</p>' : ''}
@@ -1016,6 +1135,7 @@ function renderEstoqueCartDrawer(){
       ${p.foto?`<img src="${esc(p.foto)}"/>`:`<div style="width:44px;height:44px;border-radius:8px;background:var(--teal-light)"></div>`}
       <div class="info"><div class="n">${esc(p.nome)}</div><button class="rm" onclick="estoqueSetQty('${id}',0)">remover</button></div>
       ${qtyControl(p, qty, 'estoqueChangeQty', 'estoqueSetQty')}
+      <input id="estoque-cart-obs-${id}" class="obs-input" type="text" placeholder="Observação (opcional)" value="${esc(state.estoqueCartObs[id]||'')}" oninput="setEstoqueCartObs('${id}', this.value)"/>
     </div>`;
   }).join('');
   const canSubmit = state.estoqueUnidade && estoqueCartCount()>0;
@@ -1032,218 +1152,9 @@ function renderEstoqueCartDrawer(){
   </div>`;
 }
 
-/* ================= NUTRICIONISTA ================= */
-function setNutriUserId(v){ state.nutriUserId = v; }
-function nutriAllowedUnits(){
-  const u = state.nutriUser;
-  if(!u || !u.unidades || u.unidades.length===0) return state.units;
-  return state.units.filter(un => u.unidades.includes(un.nome));
-}
-async function tryNutriLogin(){
-  if(!state.nutriUserId) return;
-  const r = await callRpc('login_usuario', {p_id: state.nutriUserId, p_senha: state.nutriSenhaInput});
-  if(r.ok && r.data && r.data.length){
-    state.nutriAuthed = true;
-    state.nutriUser = r.data[0];
-    state.nutriUnidade = '';
-    render();
-  } else {
-    showToast('Senha incorreta.');
-  }
-}
-function nutriLogout(){
-  state.nutriAuthed = false;
-  state.nutriUser = null;
-  state.nutriUserId = '';
-  state.nutriSenhaInput = '';
-  state.nutriPedidos = [];
-  state.nutriHistorico = [];
-  state.nutriForms = {};
-  state.nutriSubTab = 'pendentes';
-  render();
-}
-function setNutriSubTab(t){
-  state.nutriSubTab = t;
-  if(t==='historico') loadNutriHistorico(); else loadNutriPedidos();
-}
-function setNutriUnidade(v){
-  state.nutriUnidade = v;
-  if(state.nutriSubTab==='historico') loadNutriHistorico(); else loadNutriPedidos();
-}
-async function loadNutriPedidos(){
-  if(!state.nutriUnidade || !state.supabaseUrl || !state.supabaseKey){ state.nutriPedidos = []; render(); return; }
-  state.nutriLoading = true; render();
-  const r = await callRpc('listar_pedidos', {p_unidade: state.nutriUnidade, p_status: 'Pendente', p_tipo_pedido: ''});
-  state.nutriLoading = false;
-  if(r.ok){
-    state.nutriPedidos = r.data || [];
-    state.nutriPedidos.forEach(p=>{
-      if(!state.nutriForms[p.pedidoId]){
-        const qtds = {};
-        p.itens.forEach(it => qtds[it.produtoId] = it.qtdSolicitada);
-        state.nutriForms[p.pedidoId] = {quemEnvia:'', quemRecebe: state.nutriUser ? state.nutriUser.nome : '', situacao:'Tudo conforme', observacao:'', qtds};
-      }
-    });
-  } else {
-    state.nutriPedidos = [];
-    showToast('Não foi possível carregar os pedidos: ' + r.error);
-  }
-  render();
-}
-async function loadNutriHistorico(){
-  if(!state.nutriUnidade || !state.supabaseUrl || !state.supabaseKey){ state.nutriHistorico = []; render(); return; }
-  state.nutriLoading = true; render();
-  const r = await callRpc('listar_pedidos', {p_unidade: state.nutriUnidade, p_status: 'Recebido', p_tipo_pedido: ''});
-  state.nutriLoading = false;
-  state.nutriHistorico = r.ok ? (r.data||[]) : [];
-  if(!r.ok) showToast('Não foi possível carregar o histórico: ' + r.error);
-  state.nutriHistorico.sort((a,b)=> new Date(b.dataRecebimento||b.data) - new Date(a.dataRecebimento||a.data));
-  render();
-}
-function setNutriField(pedidoId, field, value){ state.nutriForms[pedidoId][field] = value; }
-function setNutriQtd(pedidoId, produtoId, value){ state.nutriForms[pedidoId].qtds[produtoId] = value; }
-async function confirmarRecebimento(pedidoId){
-  const form = state.nutriForms[pedidoId];
-  if(!form.quemEnvia.trim() || !form.quemRecebe.trim()){
-    showToast('Preencha o motorista e a nutricionista responsável.');
-    return;
-  }
-  const pedido = state.nutriPedidos.find(p=>p.pedidoId===pedidoId);
-  const itens = pedido.itens.map(it => ({produtoId: it.produtoId, qtdRecebida: form.qtds[it.produtoId]}));
-  const r = await callRpc('confirmar_recebimento', {p_pedido_id: pedidoId, p_quem_envia: form.quemEnvia.trim(), p_quem_recebe: form.quemRecebe.trim(), p_situacao: form.situacao, p_observacao: (form.observacao||'').trim(), p_itens: itens});
-  if(r.ok){
-    state.nutriPedidos = state.nutriPedidos.filter(p=>p.pedidoId!==pedidoId);
-    delete state.nutriForms[pedidoId];
-    showToast('Recebimento confirmado.');
-    render();
-  } else {
-    showToast('Falha ao confirmar: ' + r.error);
-  }
-}
-
 function itemQtyLabel(qtd, unidade){
   const u = unidade || 'un';
   return `${qtd}${u!=='un' ? ' '+u : ''}`;
-}
-
-function renderNutri(){
-  if(!state.nutriAuthed){
-    if(!state.users.some(u=>u.papel==='nutricionista')){
-      return `<div class="empty-state"><div class="display">Nenhuma nutricionista cadastrada</div><div>Peça ao administrador para criar um usuário em Admin → Usuários.</div></div>`;
-    }
-    const opts = state.users.filter(u=>u.papel==='nutricionista').map(u=>`<option value="${u.id}" ${state.nutriUserId===u.id?'selected':''}>${esc(u.nome)}</option>`).join('');
-    return `
-      <div class="login-gate">
-        <span class="eyebrow">Área da nutricionista</span>
-        <h2 class="display">Identifique-se</h2>
-        <select onchange="setNutriUserId(this.value)">
-          <option value="" ${!state.nutriUserId?'selected':''} disabled>Selecione seu nome</option>
-          ${opts}
-        </select>
-        <input type="password" placeholder="Senha" value="${esc(state.nutriSenhaInput)}" oninput="state.nutriSenhaInput=this.value" onkeydown="if(event.key==='Enter') tryNutriLogin()"/>
-        <button class="btn-primary" onclick="tryNutriLogin()">Entrar</button>
-      </div>`;
-  }
-
-  if(!state.supabaseUrl || !state.supabaseKey){
-    return `<div class="empty-state"><div class="display">Integração não configurada</div><div>Peça ao administrador para conectar a planilha do Google em Admin → Integração.</div></div>`;
-  }
-
-  const allowedUnits = nutriAllowedUnits();
-  const unidadeOptions = allowedUnits.map(u=>`<option ${state.nutriUnidade===u.nome?'selected':''}>${esc(u.nome)}</option>`).join('');
-  const subTab = state.nutriSubTab || 'pendentes';
-
-  let listHtml = '';
-  if(subTab==='pendentes'){
-    const cards = state.nutriPedidos.map(p=>{
-      const form = state.nutriForms[p.pedidoId] || {quemEnvia:'',quemRecebe:'',qtds:{}};
-      const itemRows = p.itens.map(it=>`
-        <div class="item-recv-row">
-          <div class="n">${esc(it.produto)}</div>
-          <div class="solicitada">Solicitado: ${itemQtyLabel(it.qtdSolicitada, it.unidadeMedida)}</div>
-          <input id="qty-${p.pedidoId}-${it.produtoId}" class="recv-qty" type="number" step="0.1" min="0" value="${esc(form.qtds[it.produtoId] ?? it.qtdSolicitada)}" oninput="setNutriQtd('${p.pedidoId}','${it.produtoId}', this.value)"/>
-        </div>`).join('');
-      return `
-      <div class="pending-card">
-        <div class="meta">
-          <span><span class="origem-tag">${p.origem==='estoquista'?'Estoquista':'Unidade'}</span> ${p.tipoPedido==='carne'?'<span class="origem-tag" style="background:var(--gold-light);color:#8a6a1f">🥩 Carne</span>':''} ${editedTag(p)} &nbsp;<b>${esc(p.solicitante)}</b> solicitou em ${new Date(p.data).toLocaleString('pt-BR')}</span>
-          <span class="status-pill pendente">Pendente</span>
-        </div>
-        ${editedBanner(p)}
-        ${itemRows}
-        <div class="form-row" style="margin-top:14px">
-          <div class="field"><label>Motorista que entregou</label><input id="motorista-${p.pedidoId}" type="text" value="${esc(form.quemEnvia)}" oninput="setNutriField('${p.pedidoId}','quemEnvia',this.value)" placeholder="Nome do motorista"/></div>
-          <div class="field"><label>Nutricionista responsável</label><input id="recebe-${p.pedidoId}" type="text" value="${esc(form.quemRecebe)}" oninput="setNutriField('${p.pedidoId}','quemRecebe',this.value)"/></div>
-          <div class="field">
-            <label>Situação da entrega</label>
-            <select onchange="setNutriField('${p.pedidoId}','situacao',this.value)">
-              <option ${form.situacao==='Tudo conforme'?'selected':''}>Tudo conforme</option>
-              <option ${form.situacao==='Divergência parcial'?'selected':''}>Divergência parcial</option>
-              <option ${form.situacao==='Divergência total'?'selected':''}>Divergência total</option>
-            </select>
-          </div>
-        </div>
-        <div class="field" style="margin-bottom:14px">
-          <label>Observação (opcional)</label>
-          <input id="obs-${p.pedidoId}" type="text" value="${esc(form.observacao||'')}" oninput="setNutriField('${p.pedidoId}','observacao',this.value)" placeholder="Ex: faltou 1kg de carne, embalagem violada, etc."/>
-        </div>
-        <button class="btn-primary" style="width:auto;padding:10px 22px" onclick="confirmarRecebimento('${p.pedidoId}')">Confirmar recebimento</button>
-      </div>`;
-    }).join('');
-    listHtml = `
-      ${state.nutriLoading ? '<p class="muted">Carregando pedidos da planilha...</p>' : ''}
-      ${!state.nutriLoading && state.nutriUnidade && cards.length===0 ? '<div class="empty-state"><div class="display">Nenhum pedido pendente</div><div>Todos os pedidos desta unidade já foram recebidos.</div></div>' : ''}
-      ${!state.nutriUnidade ? '<p class="muted">Selecione uma unidade para ver os pedidos pendentes.</p>' : ''}
-      ${cards}`;
-  } else {
-    const cards = state.nutriHistorico.map(p=>{
-      const itemRows = p.itens.map(it=>`
-        <div class="item-recv-row">
-          <div class="n">${esc(it.produto)}</div>
-          <div class="qty-compare"><span>Enviado: <b>${itemQtyLabel(it.qtdSolicitada, it.unidadeMedida)}</b></span><span>Recebido: <b>${itemQtyLabel(it.qtdRecebida, it.unidadeMedida)}</b></span></div>
-        </div>`).join('');
-      return `
-      <div class="pending-card">
-        <div class="meta">
-          <span><span class="origem-tag">${p.origem==='estoquista'?'Estoquista':'Unidade'}</span> ${editedTag(p)} &nbsp;<b>${esc(p.solicitante)}</b> solicitou em ${new Date(p.data).toLocaleString('pt-BR')}</span>
-          <span class="status-pill recebido">${esc(p.situacao||'Recebido')}</span>
-        </div>
-        ${editedBanner(p)}
-        ${itemRows}
-        <div class="form-row" style="margin-top:10px">
-          <div class="field"><label>Motorista</label><input type="text" value="${esc(p.quemEnvia||'')}" readonly/></div>
-          <div class="field"><label>Recebido por</label><input type="text" value="${esc(p.quemRecebe||'')}" readonly/></div>
-          <div class="field"><label>Data do recebimento</label><input type="text" value="${p.dataRecebimento ? new Date(p.dataRecebimento).toLocaleString('pt-BR') : '—'}" readonly/></div>
-        </div>
-        ${p.observacao?`<p class="muted" style="margin:0">Obs: ${esc(p.observacao)}</p>`:''}
-      </div>`;
-    }).join('');
-    listHtml = `
-      ${state.nutriLoading ? '<p class="muted">Carregando histórico da planilha...</p>' : ''}
-      ${!state.nutriLoading && state.nutriUnidade && cards.length===0 ? '<div class="empty-state"><div class="display">Nenhum recebimento no histórico</div></div>' : ''}
-      ${!state.nutriUnidade ? '<p class="muted">Selecione uma unidade para ver o histórico.</p>' : ''}
-      ${cards}`;
-  }
-
-  return `
-    <div class="id-bar">
-      <div class="field"><label>Nutricionista</label><input type="text" value="${esc(state.nutriUser.nome)}" readonly/></div>
-      <div class="field">
-        <label>Unidade</label>
-        <select onchange="setNutriUnidade(this.value)">
-          <option value="" ${!state.nutriUnidade?'selected':''} disabled>Selecione a unidade</option>
-          ${unidadeOptions}
-        </select>
-      </div>
-      <button class="small-btn" onclick="${subTab==='historico'?'loadNutriHistorico()':'loadNutriPedidos()'}">Atualizar</button>
-      <button class="small-btn" onclick="nutriLogout()">Sair</button>
-    </div>
-    <div class="subtabs">
-      <button class="${subTab==='pendentes'?'active':''}" onclick="setNutriSubTab('pendentes')">Pendentes</button>
-      <button class="${subTab==='historico'?'active':''}" onclick="setNutriSubTab('historico')">Histórico de recebimento</button>
-    </div>
-    ${listHtml}
-  `;
 }
 
 /* ================= ADMIN ================= */
@@ -1317,8 +1228,18 @@ async function deleteProduct(id){
   await refreshCore();
 }
 
+function setAdminProdutosCategoria(value){
+  state.adminProdutosCategoria = value;
+  render();
+}
+
 function renderAdminProdutos(){
-  const rows = state.products.map(p=>`
+  const categoriasDisponiveis = Array.from(new Set(state.products.map(p=>p.categoria).filter(Boolean))).sort();
+  const filtroCategoria = state.adminProdutosCategoria || 'Todas';
+  const produtosFiltrados = filtroCategoria === 'Todas' ? state.products : state.products.filter(p=>(p.categoria||'Sem categoria')===filtroCategoria);
+  const categoriaOptions = ['Todas', ...categoriasDisponiveis].map(c=>`<option ${filtroCategoria===c?'selected':''}>${esc(c)}</option>`).join('');
+
+  const rows = produtosFiltrados.map(p=>`
     <tr>
       <td>${p.foto?`<img src="${esc(p.foto)}"/>`:`<div style="width:38px;height:38px;border-radius:7px;background:var(--teal-light)"></div>`}</td>
       <td>${esc(p.nome)}</td>
@@ -1354,14 +1275,20 @@ function renderAdminProdutos(){
 
   return `
     <div class="toolbar">
-      <span class="muted">${state.products.length} produto(s) cadastrado(s)</span>
-      <button class="small-btn" onclick="openNewProduct()">+ Novo produto</button>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span class="muted">${produtosFiltrados.length} de ${state.products.length} produto(s)</span>
+        <select onchange="setAdminProdutosCategoria(this.value)">${categoriaOptions}</select>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="small-btn" onclick="exportArvoreProdutos()">📄 Exportar árvore de produtos</button>
+        <button class="small-btn" onclick="openNewProduct()">+ Novo produto</button>
+      </div>
     </div>
     ${formPanel}
     <div class="panel">
       <table class="admin-table">
         <thead><tr><th>Foto</th><th>Nome</th><th>Categoria</th><th>Medida</th><th>Visibilidade</th><th></th></tr></thead>
-        <tbody>${rows || '<tr><td colspan="6" class="muted">Nenhum produto cadastrado.</td></tr>'}</tbody>
+        <tbody>${rows || '<tr><td colspan="6" class="muted">Nenhum produto encontrado.</td></tr>'}</tbody>
       </table>
     </div>
   `;
@@ -1414,20 +1341,14 @@ function renderAdminUnidades(){
   `;
 }
 
-function openNewUser(papel){ state.editingUser = {id:null, nome:'', papel: papel||'estoquista', senha:'', unidades:[]}; render(); }
+function openNewUser(){ state.editingUser = {id:null, nome:'', papel:'estoquista', senha:'', unidades:[]}; render(); }
 function openEditUser(id){ state.editingUser = {unidades:[], senha:'', ...state.users.find(u=>u.id===id)}; state.editingUser.senha=''; render(); }
-function toggleUserUnidade(nome, checked){
-  const eu = state.editingUser;
-  const set = new Set(eu.unidades||[]);
-  if(checked) set.add(nome); else set.delete(nome);
-  eu.unidades = Array.from(set);
-}
 async function saveUser(){
   const eu = state.editingUser;
   if(!eu.nome.trim()){ showToast('Preencha o nome.'); return; }
   if(!eu.id && !(eu.senha||'').trim()){ showToast('Defina uma senha para o novo usuário.'); return; }
   const r = await callRpc('salvar_usuario', {
-    p_admin_senha: state.adminPass, p_id: eu.id || '', p_nome: eu.nome.trim(), p_papel: eu.papel,
+    p_admin_senha: state.adminPass, p_id: eu.id || '', p_nome: eu.nome.trim(), p_papel: 'estoquista',
     p_senha: (eu.senha||'').trim() || '__MANTER__', p_unidades: eu.unidades || []
   });
   if(!r.ok){ showToast(r.error || 'Falha ao salvar usuário.'); return; }
@@ -1460,8 +1381,7 @@ function renderAdminUsuarios(){
   const rows = state.users.map(u=>`
     <tr>
       <td>${esc(u.nome)}</td>
-      <td><span class="role-badge">${u.papel==='estoquista'?'Estoquista':'Nutricionista'}</span></td>
-      <td>${u.papel==='nutricionista' ? (u.unidades && u.unidades.length ? esc(u.unidades.join(', ')) : '<span class="muted">Todas as unidades</span>') : '<span class="muted">—</span>'}</td>
+      <td><span class="role-badge">Estoquista</span></td>
       <td><input class="inline-pass" type="text" placeholder="nova senha — Enter p/ salvar" onkeydown="if(event.key==='Enter'){ quickSetUserSenha('${u.id}', this.value, this); }"/></td>
       <td class="row-actions">
         <button class="edit" onclick="openEditUser('${u.id}')">Editar</button>
@@ -1470,31 +1390,13 @@ function renderAdminUsuarios(){
     </tr>`).join('');
 
   const eu = state.editingUser;
-  const unidadesCheckboxes = eu && eu.papel==='nutricionista' ? `
-      <div class="field" style="flex-basis:100%">
-        <label>Unidades com acesso (nenhuma marcada = acesso a todas)</label>
-        <div class="tag-list" style="margin-top:6px">
-          ${state.units.map(u=>`
-            <label class="checkbox-row" style="margin:0 14px 6px 0">
-              <input type="checkbox" ${(eu.unidades||[]).includes(u.nome)?'checked':''} onchange="toggleUserUnidade('${esc(u.nome)}', this.checked)"/> ${esc(u.nome)}
-            </label>`).join('')}
-        </div>
-      </div>` : '';
 
   const formPanel = eu ? `
     <div class="panel">
       <h3>${eu.id ? 'Editar usuário' : 'Novo usuário'}</h3>
       <div class="form-row">
         <div class="field"><label>Nome</label><input type="text" value="${esc(eu.nome)}" oninput="state.editingUser.nome=this.value"/></div>
-        <div class="field">
-          <label>Papel</label>
-          <select onchange="state.editingUser.papel=this.value; render()">
-            <option value="estoquista" ${eu.papel==='estoquista'?'selected':''}>Estoquista</option>
-            <option value="nutricionista" ${eu.papel==='nutricionista'?'selected':''}>Nutricionista</option>
-          </select>
-        </div>
         <div class="field"><label>Senha ${eu.id ? '(deixe em branco para manter a atual)' : ''}</label><input type="text" value="${esc(eu.senha||'')}" oninput="state.editingUser.senha=this.value" placeholder="${eu.id ? 'nova senha (opcional)' : 'defina uma senha'}"/></div>
-        ${unidadesCheckboxes}
       </div>
       <button class="btn-primary" style="width:auto;padding:10px 22px" onclick="saveUser()">Salvar usuário</button>
       <button class="btn-secondary" onclick="state.editingUser=null; render()">Cancelar</button>
@@ -1503,25 +1405,224 @@ function renderAdminUsuarios(){
   return `
     <div class="toolbar">
       <span class="muted">${state.users.length} usuário(s) cadastrado(s)</span>
-      <button class="small-btn" onclick="openNewUser('estoquista')">+ Novo usuário</button>
+      <button class="small-btn" onclick="openNewUser()">+ Novo usuário</button>
     </div>
     ${formPanel}
     <div class="panel">
       <table class="admin-table">
-        <thead><tr><th>Nome</th><th>Papel</th><th>Unidades</th><th>Nova senha</th><th></th></tr></thead>
-        <tbody>${rows || '<tr><td colspan="5" class="muted">Nenhum usuário cadastrado ainda.</td></tr>'}</tbody>
+        <thead><tr><th>Nome</th><th>Papel</th><th>Nova senha</th><th></th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="4" class="muted">Nenhum usuário cadastrado ainda.</td></tr>'}</tbody>
       </table>
     </div>
   `;
 }
 
-function exportXLSX(rows, filename){
-  if(typeof XLSX === 'undefined'){ showToast('Biblioteca de exportação não carregou. Verifique a internet.'); return; }
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = rows[0].map(()=>({wch:20}));
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Pedidos');
-  XLSX.writeFile(wb, filename);
+/* ================= EXPORTAÇÃO EM PDF (com foto do produto) ================= */
+
+// Carrega a foto de um produto (URL ou data:) e devolve já redimensionada como
+// data URL de imagem, pronta para o jsPDF. Se a foto não puder ser carregada
+// (sem internet, CORS bloqueado pelo site da foto, etc.) devolve null e a
+// exportação segue sem aquela foto, em vez de travar.
+function loadImageForPdf(url){
+  return new Promise((resolve)=>{
+    if(!url){ resolve(null); return; }
+    try{
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      const timer = setTimeout(()=>resolve(null), 7000);
+      img.onload = ()=>{
+        clearTimeout(timer);
+        try{
+          const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+          if(!w || !h){ resolve(null); return; }
+          const maxDim = 240;
+          const scale = Math.min(1, maxDim / Math.max(w,h));
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, Math.round(w*scale));
+          canvas.height = Math.max(1, Math.round(h*scale));
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve({dataUrl: canvas.toDataURL('image/jpeg', 0.82), w: canvas.width, h: canvas.height});
+        }catch(e){ resolve(null); }
+      };
+      img.onerror = ()=>{ clearTimeout(timer); resolve(null); };
+      img.src = url;
+    }catch(e){ resolve(null); }
+  });
+}
+
+async function buildProdutoPhotoMap(produtoIds){
+  const map = {};
+  await Promise.all(Array.from(new Set(produtoIds)).map(async id=>{
+    const p = state.products.find(x=>x.id===id);
+    if(p && p.foto) map[id] = await loadImageForPdf(p.foto);
+  }));
+  return map;
+}
+
+function findPedidoAnywhere(pedidoId){
+  return (state.estoqueAcompData||[]).find(o=>o.pedidoId===pedidoId)
+      || (state.adminPedidosData||[]).find(o=>o.pedidoId===pedidoId)
+      || (state.lojaAcompData||[]).find(o=>o.pedidoId===pedidoId)
+      || null;
+}
+
+// Desenha uma linha de item (foto + nome + observação + status) no PDF,
+// cuidando de pular de página quando não cabe mais espaço.
+function drawPdfItemRow(doc, y, it, photoMap, pageH, marginX, pageW){
+  const rowH = 22;
+  if(y + rowH > pageH - 20){ doc.addPage(); y = 20; }
+  const photo = photoMap[it.produtoId];
+  if(photo){
+    try{
+      const ratio = photo.w / photo.h;
+      let ph = 16, pw = ph * ratio;
+      if(pw > 16){ pw = 16; ph = pw / ratio; }
+      doc.addImage(photo.dataUrl, 'JPEG', marginX, y, pw, ph);
+    }catch(e){ /* segue sem a foto se o formato não for aceito */ }
+  } else {
+    doc.setDrawColor(210); doc.rect(marginX, y, 16, 16);
+  }
+  const textX = marginX + 22;
+  const textW = pageW - marginX*2 - 22;
+  doc.setFontSize(10.5); doc.setTextColor(20);
+  doc.text(it.produto || it.nome || '', textX, y + 6, {maxWidth: textW});
+  doc.setFontSize(9); doc.setTextColor(90);
+  const qtdTxt = `Qtd: ${itemQtyLabel(it.qtdSolicitada, it.unidadeMedida)}` + (it.qtdRecebida!=null && it.qtdRecebida!=='' ? ` · recebido: ${itemQtyLabel(it.qtdRecebida, it.unidadeMedida)}` : '');
+  doc.text(qtdTxt, textX, y + 11.5, {maxWidth: textW});
+  let statusTxt = it.enviado ? `Enviado${it.dataEnvio ? ' em '+new Date(it.dataEnvio).toLocaleDateString('pt-BR') : ''}` : 'Aguardando envio';
+  if(it.observacao) statusTxt += `  ·  Obs: ${it.observacao}`;
+  doc.text(statusTxt, textX, y + 16.5, {maxWidth: textW});
+  doc.setDrawColor(230);
+  doc.line(marginX, y + rowH - 3, pageW - marginX, y + rowH - 3);
+  return y + rowH;
+}
+
+async function exportPedidoPdf(pedidoId){
+  if(typeof jspdf === 'undefined' && typeof window.jspdf === 'undefined'){ showToast('Biblioteca de exportação não carregou. Verifique a internet.'); return; }
+  const o = findPedidoAnywhere(pedidoId);
+  if(!o){ showToast('Pedido não encontrado para exportar.'); return; }
+  showToast('Gerando PDF...');
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:'mm', format:'a4'});
+  const marginX = 15, pageW = doc.internal.pageSize.getWidth(), pageH = doc.internal.pageSize.getHeight();
+  let y = 20;
+
+  doc.setFontSize(16); doc.setTextColor(13,92,80);
+  doc.text(`Pedido — ${esc0(o.unidade)}`, marginX, y); y += 8;
+  doc.setFontSize(10); doc.setTextColor(90);
+  doc.text(`Solicitante: ${esc0(o.solicitante)}   ·   Data: ${new Date(o.data).toLocaleString('pt-BR')}`, marginX, y); y += 6;
+  doc.text(`Status: ${esc0(o.status)}${o.categoria ? '   ·   Lojinha: '+esc0(o.categoria) : ''}${o.tipoPedido==='carne' ? '   ·   Pedido de carne' : ''}`, marginX, y); y += 6;
+  if(o.status==='Recebido'){
+    doc.text(`Motorista: ${esc0(o.quemEnvia||'—')}   ·   Recebido por: ${esc0(o.quemRecebe||'—')}${o.situacao ? '   ·   Situação: '+esc0(o.situacao) : ''}`, marginX, y); y += 6;
+  }
+  if(o.observacao){ doc.text(`Obs. geral: ${esc0(o.observacao)}`, marginX, y, {maxWidth: pageW - marginX*2}); y += 6; }
+  y += 4;
+
+  const photoMap = await buildProdutoPhotoMap(o.itens.map(it=>it.produtoId));
+  o.itens.forEach(it=>{ y = drawPdfItemRow(doc, y, it, photoMap, pageH, marginX, pageW); });
+
+  doc.save(`pedido_${o.unidade}_${pedidoId}.pdf`.replace(/\s+/g,'_'));
+}
+
+// Exporta a lista de compras: uma lista consolidada (com foto) de todos os
+// pedidos filtrados na tela atual — útil para o estoquista/admin ver de uma
+// vez só tudo que precisa comprar/despachar.
+async function exportListaCompras(list){
+  if(typeof jspdf === 'undefined' && typeof window.jspdf === 'undefined'){ showToast('Biblioteca de exportação não carregou. Verifique a internet.'); return; }
+  if(!list || list.length===0){ showToast('Não há pedidos para exportar.'); return; }
+  showToast('Gerando PDF...');
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:'mm', format:'a4'});
+  const marginX = 15, pageW = doc.internal.pageSize.getWidth(), pageH = doc.internal.pageSize.getHeight();
+  let y = 20;
+
+  doc.setFontSize(16); doc.setTextColor(13,92,80);
+  doc.text('Lista de compras — Paulu\'s', marginX, y); y += 7;
+  doc.setFontSize(9.5); doc.setTextColor(120);
+  doc.text(`Gerado em ${new Date().toLocaleString('pt-BR')}   ·   ${list.length} pedido(s)`, marginX, y); y += 8;
+
+  const allProdutoIds = [];
+  list.forEach(o => o.itens.forEach(it => allProdutoIds.push(it.produtoId)));
+  const photoMap = await buildProdutoPhotoMap(allProdutoIds);
+
+  list.forEach(o=>{
+    if(y + 16 > pageH - 20){ doc.addPage(); y = 20; }
+    doc.setFontSize(11.5); doc.setTextColor(13,92,80);
+    doc.text(`${o.unidade} — ${o.solicitante}${o.categoria ? ' ('+o.categoria+')' : ''}`, marginX, y); y += 5;
+    doc.setFontSize(9); doc.setTextColor(120);
+    doc.text(`${new Date(o.data).toLocaleDateString('pt-BR')}   ·   Status: ${o.status}`, marginX, y); y += 6;
+    o.itens.forEach(it=>{ y = drawPdfItemRow(doc, y, it, photoMap, pageH, marginX, pageW); });
+    y += 4;
+  });
+
+  doc.save(`lista_compras_paulus_${Date.now()}.pdf`);
+}
+
+// Escapa texto simples para uso direto no jsPDF (que não interpreta HTML,
+// então aqui só cuidamos de nunca passar null/undefined).
+function esc0(v){ return (v===null || v===undefined) ? '' : String(v); }
+
+// Exporta a árvore de produtos (todos os produtos cadastrados, agrupados por
+// categoria/lojinha) com foto — para o admin visualizar/imprimir o catálogo.
+async function exportArvoreProdutos(){
+  if(typeof jspdf === 'undefined' && typeof window.jspdf === 'undefined'){ showToast('Biblioteca de exportação não carregou. Verifique a internet.'); return; }
+  if(!state.products.length){ showToast('Não há produtos cadastrados para exportar.'); return; }
+  showToast('Gerando PDF...');
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:'mm', format:'a4'});
+  const marginX = 15, pageW = doc.internal.pageSize.getWidth(), pageH = doc.internal.pageSize.getHeight();
+  let y = 20;
+
+  doc.setFontSize(16); doc.setTextColor(13,92,80);
+  doc.text('Árvore de produtos — Paulu\'s', marginX, y); y += 7;
+  doc.setFontSize(9.5); doc.setTextColor(120);
+  doc.text(`Gerado em ${new Date().toLocaleString('pt-BR')}   ·   ${state.products.length} produto(s)`, marginX, y); y += 8;
+
+  const photoMap = await buildProdutoPhotoMap(state.products.map(p=>p.id));
+  const porCategoria = {};
+  state.products.forEach(p=>{
+    const cat = p.categoria || 'Sem categoria';
+    (porCategoria[cat] = porCategoria[cat] || []).push(p);
+  });
+  const categorias = Object.keys(porCategoria).sort();
+
+  categorias.forEach(cat=>{
+    if(y + 14 > pageH - 20){ doc.addPage(); y = 20; }
+    doc.setFontSize(13); doc.setTextColor(13,92,80);
+    doc.text(`${cat} (${porCategoria[cat].length})`, marginX, y); y += 3;
+    doc.setDrawColor(13,92,80);
+    doc.line(marginX, y, pageW - marginX, y); y += 6;
+
+    porCategoria[cat].forEach(p=>{
+      const rowH = 20;
+      if(y + rowH > pageH - 20){ doc.addPage(); y = 20; }
+      const photo = photoMap[p.id];
+      if(photo){
+        try{
+          const ratio = photo.w / photo.h;
+          let ph = 15, pw = ph * ratio;
+          if(pw > 15){ pw = 15; ph = pw / ratio; }
+          doc.addImage(photo.dataUrl, 'JPEG', marginX, y, pw, ph);
+        }catch(e){ /* segue sem a foto */ }
+      } else {
+        doc.setDrawColor(210); doc.rect(marginX, y, 15, 15);
+      }
+      const textX = marginX + 21, textW = pageW - marginX*2 - 21;
+      doc.setFontSize(10.5); doc.setTextColor(20);
+      doc.text(p.nome || '', textX, y + 5.5, {maxWidth: textW});
+      doc.setFontSize(9); doc.setTextColor(110);
+      const medida = ({un:'Unidade',kg:'Peso (kg)',cx:'Caixa'})[p.unidadeMedida||'un'];
+      const visib = p.somenteEstoquista ? 'Só estoquista' : 'Todos';
+      doc.text(`Medida: ${medida}   ·   Visibilidade: ${visib}`, textX, y + 11, {maxWidth: textW});
+      doc.setDrawColor(235);
+      doc.line(marginX, y + rowH - 3, pageW - marginX, y + rowH - 3);
+      y += rowH;
+    });
+    y += 3;
+  });
+
+  doc.save(`arvore_produtos_paulus_${Date.now()}.pdf`);
 }
 
 async function loadAdminPedidos(){
@@ -1546,32 +1647,6 @@ function setAdminPedidosFiltro(field, value){
   state[field] = value;
   loadAdminPedidos();
 }
-function buildPedidosExportRows(list){
-  const rows = [['Data do Pedido','Unidade','Tipo de Pedido','Produto','Qtd Enviada','Qtd Recebida','Enviado por (Motorista)','Recebido por (Nutricionista)','Situação','Observação','Status','Data Recebimento']];
-  list.forEach(p=>{
-    p.itens.forEach(it=>{
-      rows.push([
-        new Date(p.data).toLocaleString('pt-BR'),
-        p.unidade,
-        p.tipoPedido==='carne' ? 'Carne' : 'Geral',
-        it.produto + (it.unidadeMedida && it.unidadeMedida!=='un' ? ` (${it.unidadeMedida})` : ''),
-        it.qtdSolicitada,
-        it.qtdRecebida || '',
-        p.quemEnvia || '',
-        p.quemRecebe || '',
-        p.situacao || '',
-        p.observacao || '',
-        p.status || '',
-        p.dataRecebimento ? new Date(p.dataRecebimento).toLocaleString('pt-BR') : ''
-      ]);
-    });
-  });
-  return rows;
-}
-function exportAdminPedidos(){
-  exportXLSX(buildPedidosExportRows(state.adminPedidosData), `pedidos_paulus_${Date.now()}.xlsx`);
-}
-
 /* ---- Editar pedido (admin) ---- */
 function openEditPedido(pedidoId){
   const p = state.adminPedidosData.find(x=>x.pedidoId===pedidoId);
@@ -1616,7 +1691,7 @@ async function saveEditedPedido(){
   if(itens.length === 0){ showToast('O pedido precisa ter ao menos um item.'); return; }
   const r = await callRpc('editar_pedido', {p_admin_senha: state.adminPass, p_pedido_id: ep.pedidoId, p_itens: itens});
   if(r.ok){
-    showToast('Pedido atualizado. A nutricionista verá o aviso de alteração.');
+    showToast('Pedido atualizado. O estoquista verá o aviso de alteração.');
     state.editingPedido = null;
     loadAdminPedidos();
   } else {
@@ -1663,7 +1738,7 @@ function renderEditPedidoPanel(){
           </div>
           <button class="small-btn" onclick="addEditPedidoItem()">+ Adicionar</button>
         </div>
-        <p class="muted" style="margin-top:10px">⚠️ Ao salvar, a nutricionista verá um aviso de que este pedido foi alterado por um administrador.</p>
+        <p class="muted" style="margin-top:10px">⚠️ Ao salvar, o estoquista verá um aviso de que este pedido foi alterado por um administrador.</p>
       </div>
       <footer>
         <button class="btn-primary" onclick="saveEditedPedido()">Salvar alterações</button>
@@ -1677,14 +1752,15 @@ function renderAdminPedidos(){
   const cards = state.adminPedidosData.map(o=>`
     <div class="order-card">
       <div class="meta">
-        <span><span class="origem-tag">${o.origem==='estoquista'?'Estoquista':'Unidade'}</span> ${o.tipoPedido==='carne'?'<span class="origem-tag" style="background:var(--gold-light);color:#8a6a1f">🥩 Carne</span>':''} ${editedTag(o)} &nbsp;<b>${esc(o.unidade)}</b> · ${esc(o.solicitante)}</span>
-        <span class="status-pill ${o.status==='Recebido'?'recebido':'pendente'}">${esc(o.status==='Recebido' ? (o.situacao||'Recebido') : 'Pendente')}</span>
+        <span><span class="origem-tag">${o.origem==='estoquista'?'Estoquista':'Unidade'}</span> ${o.categoria?`<span class="origem-tag">${esc(o.categoria)}</span>`:''} ${o.tipoPedido==='carne'?'<span class="origem-tag" style="background:var(--gold-light);color:#8a6a1f">🥩 Carne</span>':''} ${editedTag(o)} &nbsp;<b>${esc(o.unidade)}</b> · ${esc(o.solicitante)}</span>
+        <span class="status-pill ${statusPillClass(o.status)}">${esc(o.status==='Recebido' ? (o.situacao||'Recebido') : o.status)}</span>
       </div>
       ${editedBanner(o)}
-      <ul>${o.itens.map(it=>`<li>${esc(it.produto)} — enviado ${itemQtyLabel(it.qtdSolicitada, it.unidadeMedida)}${it.qtdRecebida!=='' && it.qtdRecebida!==undefined && it.qtdRecebida!==null?` · recebido ${itemQtyLabel(it.qtdRecebida, it.unidadeMedida)}`:''}</li>`).join('')}</ul>
+      <ul>${o.itens.map(it=>`<li>${esc(it.produto)} — ${itemStatusLine(it)}${it.observacao?`<br><span class="muted" style="font-size:12px">Obs: ${esc(it.observacao)}</span>`:''}</li>`).join('')}</ul>
       ${o.status==='Recebido' ? `<div class="meta" style="margin-top:8px"><span>Motorista: <b>${esc(o.quemEnvia||'—')}</b> · Recebido por: <b>${esc(o.quemRecebe||'—')}</b></span><span>${o.dataRecebimento ? new Date(o.dataRecebimento).toLocaleString('pt-BR') : ''}</span></div>${o.observacao?`<p class="muted" style="margin:6px 0 0">Obs: ${esc(o.observacao)}</p>`:''}` : ''}
-      <div style="margin-top:10px;display:flex;gap:8px">
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
         ${o.status!=='Recebido' ? `<button class="small-btn" onclick="openEditPedido('${o.pedidoId}')">✏️ Editar pedido</button>` : ''}
+        <button class="small-btn" onclick="exportPedidoPdf('${o.pedidoId}')">📄 Exportar este pedido</button>
         <button class="small-btn" style="color:var(--danger);border-color:var(--danger)" onclick="deletePedido('${o.pedidoId}')">🗑️ Excluir pedido</button>
       </div>
     </div>`).join('');
@@ -1693,7 +1769,7 @@ function renderAdminPedidos(){
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <select onchange="setAdminPedidosFiltro('adminPedidosUnidade', this.value)">${unidadeFilterOptions}</select>
         <select onchange="setAdminPedidosFiltro('adminPedidosStatus', this.value)">
-          ${['Todos','Pendente','Recebido'].map(s=>`<option ${state.adminPedidosStatus===s?'selected':''}>${esc(s)}</option>`).join('')}
+          ${['Todos','Pendente','Parcialmente enviado','Enviado','Recebido'].map(s=>`<option ${state.adminPedidosStatus===s?'selected':''}>${esc(s)}</option>`).join('')}
         </select>
         <select onchange="setAdminPedidosFiltro('adminPedidosTipo', this.value)">
           ${['Todos','Carne','Geral'].map(s=>`<option ${state.adminPedidosTipo===s?'selected':''}>${esc(s)}</option>`).join('')}
@@ -1701,7 +1777,7 @@ function renderAdminPedidos(){
       </div>
       <div style="display:flex;gap:8px">
         <button class="small-btn" onclick="loadAdminPedidos()">Atualizar</button>
-        <button class="small-btn" onclick="exportAdminPedidos()">Exportar XLSX</button>
+        <button class="small-btn" onclick="exportListaCompras(state.adminPedidosData)">📄 Exportar lista (PDF)</button>
       </div>
     </div>
     ${(!state.supabaseUrl || !state.supabaseKey) ? '<p class="muted">Banco de dados não conectado. Configure em Admin → Integração.</p>' : ''}
@@ -1773,7 +1849,6 @@ async function trocarSenhaAdmin(){
 function renderTopbar(){
   let who = '';
   if(state.view==='estoque' && state.estoqueAuthed) who = `<div class="who-badge">Estoquista: <b>${esc(state.estoqueUser.nome)}</b> <button onclick="estoqueLogout()">sair</button></div>`;
-  if(state.view==='nutri' && state.nutriAuthed) who = `<div class="who-badge">Nutricionista: <b>${esc(state.nutriUser.nome)}</b> <button onclick="nutriLogout()">sair</button></div>`;
   return `
   <header class="topbar">
     <div class="brand">
@@ -1787,7 +1862,6 @@ function renderTopbar(){
     <div class="nav-toggle">
       <button class="${state.view==='loja'?'active':''}" onclick="switchView('loja')">Loja</button>
       <button class="${state.view==='estoque'?'active':''}" onclick="switchView('estoque')">Estoquista</button>
-      <button class="${state.view==='nutri'?'active':''}" onclick="switchView('nutri')">Nutricionista</button>
       <button class="${state.view==='admin'?'active':''}" onclick="switchView('admin')">Admin</button>
     </div>
     <button class="small-btn" onclick="manualRefresh()" title="Recarrega produtos, unidades, usuários e a planilha">🔄 Carregar planilha</button>
@@ -1806,7 +1880,6 @@ function render(){
   let body = '';
   if(state.view==='loja') body = renderLoja();
   else if(state.view==='estoque') body = renderEstoque();
-  else if(state.view==='nutri') body = renderNutri();
   else body = renderAdmin();
 
   app.innerHTML = `
